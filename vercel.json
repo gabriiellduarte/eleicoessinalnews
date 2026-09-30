@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "regions": ["gru1"],
+  "functions": {
+    "api/*.js": { "maxDuration": 30 }
+  },
+  "rewrites": [
+    { "source": "/api/tse/:caminho*", "destination": "/api/tse?caminho=:caminho*" },
+    { "source": "/api/cadastro/:caminho*", "destination": "/api/cadastro?caminho=:caminho*" }
+  ]
+}

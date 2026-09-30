@@ -1,0 +1,12 @@
+{
+  "name": "sinal-news-apuracao",
+  "version": "1.0.0",
+  "description": "Apuração de votos ao vivo (telão + público) - Sinal News - Eleições 2026",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
