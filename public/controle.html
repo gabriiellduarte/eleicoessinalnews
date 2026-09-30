@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Controle do telão | Sinal News</title>
+  <link rel="icon" href="https://sinalnews.com.br/wp-content/uploads/2020/09/cropped-favicon-vermelho-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body class="controle">
+  <header class="topo">
+    <a class="logo" href="index.html"><img id="logo" alt="Sinal News"></a>
+    <div class="topo-titulo">
+      <strong>Controle do telão</strong>
+      <span>Abra o telão neste mesmo navegador (outra janela ou monitor)</span>
+    </div>
+    <button type="button" class="botao" id="abrir">Abrir telão</button>
+  </header>
+  <main class="controle-corpo">
+    <div id="painel"></div>
+  </main>
+
+  <script type="module">
+    import { fonte } from './js/fontes/index.js';
+    import { montarLogo } from './js/ui.js';
+    import { montarPainel } from './js/painel.js';
+    montarLogo(document.getElementById('logo'));
+    montarPainel(document.getElementById('painel'), fonte);
+    document.getElementById('abrir').addEventListener('click', () => window.open('telao.html' + location.search, 'sinal-telao'));
+  </script>
+</body>
+</html>

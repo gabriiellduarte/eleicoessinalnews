@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR" class="telao">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Telão · Apuração Eleições 2026 | Sinal News</title>
+  <link rel="icon" href="https://sinalnews.com.br/wp-content/uploads/2020/09/cropped-favicon-vermelho-32x32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body class="telao-corpo">
+  <div class="palco">
+    <header class="t-topo">
+      <div class="t-logo"><img id="logo" alt="Sinal News"></div>
+      <div class="t-titulo">
+        <div class="t-kicker">ELEIÇÕES 2026 · APURAÇÃO · <span id="turno"></span>º TURNO <span class="selo-sim" id="selo-status" hidden>AGUARDANDO O INÍCIO DA TOTALIZAÇÃO · TSE</span></div>
+        <h1 id="t-titulo"></h1>
+      </div>
+      <div class="t-dir">
+        <span class="aovivo">AO VIVO</span>
+        <span id="relogio"></span>
+      </div>
+    </header>
+
+    <main class="t-cena" id="cena">
+      <section id="cena-cargo" hidden>
+        <div class="duelo" id="duelo"></div>
+        <div class="t-lado">
+          <div class="faixa-resultado" id="faixa-resultado" hidden></div>
+          <div class="t-painel painel-lista" style="flex:1">
+            <h2>Demais candidatos</h2>
+            <div class="rol-janela"><ul class="lista" id="demais"></ul></div>
+          </div>
+          <div class="t-painel">
+            <div class="numeros">
+              <div><span>Comparecimento</span><b data-s="pctComparecimento">–</b><small data-s="comparecimento"></small></div>
+              <div><span>Abstenção</span><b data-s="pctAbstencao">–</b><small data-s="abstencao"></small></div>
+              <div><span>Brancos</span><b data-s="pctBrancos">–</b><small data-s="brancos"></small></div>
+              <div><span>Nulos</span><b data-s="pctNulos">–</b><small data-s="nulos"></small></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="cena-mapa" hidden>
+        <div id="t-mapa"></div>
+        <div class="t-lado">
+          <div class="t-painel">
+            <h2>Resultado nacional</h2>
+            <ul class="lista" id="t-legenda"></ul>
+          </div>
+          <div class="t-painel">
+            <h2>Quem lidera nos estados</h2>
+            <div class="lideres" id="t-lideres"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="cena-lista" hidden>
+        <div class="t-painel">
+          <h2 id="ranking-titulo"></h2>
+          <div class="ranking-janela"><ul class="lista ranking" id="ranking"></ul></div>
+        </div>
+      </section>
+
+      <section id="cena-destaques" hidden>
+        <div class="locais" id="locais"></div>
+      </section>
+    </main>
+
+    <footer class="t-rodape">
+      <div class="t-prog">
+        <span class="rotulo">SEÇÕES TOTALIZADAS</span>
+        <span class="valor" data-s="pctSecoes">–</span>
+        <div class="barra"><i data-barra-secoes></i></div>
+        <span data-s="secoes"></span>
+        <span>Atualizado às <b data-s="atualizadoEm">–</b></span>
+      </div>
+      <div class="ticker"><div class="ticker-faixa" id="ticker"></div></div>
+    </footer>
+
+    <div class="t-erro" id="t-erro" hidden></div>
+    <div class="ajuda" id="ajuda" hidden>
+      <div><kbd>C</kbd> painel de controle sobre o telão (o normal é usar o celular ou /controle)</div>
+      <div><kbd>←</kbd><kbd>→</kbd> trocar de cena · <kbd>1</kbd>–<kbd>7</kbd> ir direto</div>
+      <div><kbd>Espaço</kbd> pausar / retomar o rodízio</div>
+      <div><kbd>F</kbd> tela cheia</div>
+      <div><kbd>H</kbd> mostrar / esconder esta ajuda</div>
+    </div>
+  </div>
+
+  <button type="button" class="t-engrenagem" id="tela-cheia" title="Tela cheia (F)" aria-label="Tela cheia">
+    <svg class="entrar" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    <svg class="sair" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+  </button>
+  <aside class="t-gaveta" id="gaveta" hidden>
+    <div class="t-gaveta-topo"><strong>Controle do telão</strong><button type="button" id="fechar-painel" aria-label="Fechar">✕</button></div>
+    <div id="painel"></div>
+  </aside>
+
+  <script type="module" src="js/telao.js"></script>
+</body>
+</html>

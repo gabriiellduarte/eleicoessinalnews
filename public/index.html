@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apuração Eleições 2026 | Sinal News</title>
+  <meta name="description" content="Acompanhe a apuração dos votos das Eleições 2026 em tempo real na Sinal News.">
+  <meta name="theme-color" content="#D90404">
+  <link rel="icon" href="https://sinalnews.com.br/wp-content/uploads/2020/09/cropped-favicon-vermelho-32x32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+  <header class="topo">
+    <a class="logo" href="https://sinalnews.com.br/"><img id="logo" alt="Sinal News"></a>
+    <div class="topo-titulo">
+      <strong>Apuração</strong>
+      <span>Eleições 2026 · <span id="turno"></span>º turno</span>
+    </div>
+    <span class="aovivo">AO VIVO</span>
+  </header>
+
+  <nav class="abas" id="abas" role="tablist" aria-label="Cargo"></nav>
+
+  <main class="grade">
+    <section class="cartao">
+      <div class="cab">
+        <div>
+          <h1 id="titulo"></h1>
+          <p id="local"></p>
+        </div>
+        <div class="filtros">
+          <select id="uf" aria-label="Estado"></select>
+          <select id="cidade" aria-label="Cidade"></select>
+          <select id="quantos" aria-label="Quantos candidatos mostrar" hidden>
+            <option value="10">10 mais votados</option>
+            <option value="30" selected>30 mais votados</option>
+            <option value="50">50 mais votados</option>
+            <option value="100">100 mais votados</option>
+            <option value="vagas">Dentro das vagas</option>
+            <option value="todos">Todos os candidatos</option>
+          </select>
+        </div>
+      </div>
+      <input type="search" id="busca" class="busca" placeholder="Buscar candidato por nome ou número" aria-label="Buscar candidato">
+
+      <div class="progresso" id="progresso">
+        <div class="progresso-topo">
+          <span>Seções totalizadas <b data-s="pctSecoes">–</b></span>
+          <span><span data-s="secoes"></span> · atualizado às <span data-s="atualizadoEm">–</span></span>
+        </div>
+        <div class="barra"><i data-barra-secoes></i></div>
+      </div>
+
+      <div class="faixa-resultado" id="faixa-resultado" hidden></div>
+      <div class="erro" id="erro" hidden></div>
+      <ul class="lista" id="lista" aria-live="off"></ul>
+      <p class="nota" id="nota-lista" hidden></p>
+    </section>
+
+    <aside class="lateral">
+      <section class="cartao" id="destaques" hidden>
+        <h2 id="destaques-titulo"></h2>
+        <ul class="dest" id="destaques-lista"></ul>
+      </section>
+
+      <section class="cartao">
+        <h2 id="mapa-titulo">Por estado</h2>
+        <div id="mapa"></div>
+        <div class="legenda" id="legenda"></div>
+      </section>
+
+      <section class="cartao" id="numeros">
+        <h2>Números da votação</h2>
+        <div class="numeros">
+          <div><span>Eleitorado</span><b data-s="eleitorado">–</b></div>
+          <div><span>Votos válidos</span><b data-s="validos">–</b></div>
+          <div><span>Comparecimento</span><b data-s="comparecimento">–</b><small data-s="pctComparecimento"></small></div>
+          <div><span>Abstenção</span><b data-s="abstencao">–</b><small data-s="pctAbstencao"></small></div>
+          <div><span>Brancos</span><b data-s="brancos">–</b><small data-s="pctBrancos"></small></div>
+          <div><span>Nulos</span><b data-s="nulos">–</b><small data-s="pctNulos"></small></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="rodape">
+    <span id="fonte-dados"></span>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
