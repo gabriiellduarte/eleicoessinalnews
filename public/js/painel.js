@@ -228,12 +228,11 @@ export function montarPainel(el, fonte) {
     // Computador do estúdio (localhost ou IP da rede): endereços da rede local.
     // Site publicado (Hostinger, Vercel...): o próprio endereço do site.
     const noEstudio = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
-    const semBancoNaVercel = !rede.aoVivo && !rede.banco && /vercel\.app$/.test(location.hostname);
     q('[data-rede]').innerHTML = !rede.ligada
       ? 'Controle remoto indisponível neste endereço: vale apenas entre janelas do mesmo navegador.'
       : noEstudio && rede.enderecos.length
         ? `No celular, na mesma rede Wi-Fi, abra:<br>${rede.enderecos.map((e) => `<strong>${esc(e)}/controle</strong>`).join('<br>')}`
-        : `No celular, de qualquer rede, abra: <strong>${esc(location.origin)}/controle</strong><br>${semBancoNaVercel ? 'Sem banco de dados na Vercel, o controle remoto pode falhar de vez em quando (veja o README).' : 'Controle remoto ligado.'}`;
+        : `No celular, de qualquer rede, abra: <strong>${esc(location.origin)}/controle</strong>`;
     q('[data-acao="rodizio"]').textContent = estado.rodizio ? '❚❚ Pausar rodízio' : '▶ Retomar rodízio';
     q('[data-acao="rodizio"]').classList.toggle('ativo', estado.rodizio);
     const definirValor = (campo, valor) => {
