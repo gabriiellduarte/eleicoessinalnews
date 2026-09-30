@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { UFS, UF_POR_SIGLA, CARGOS, nomeLocal, tituloCargo, semAcento } from './ufs.js';
 import { fonte } from './fontes/index.js';
 import { carregarDestaques, rotuloCargo, textoPosicao } from './destaques.js';
-import { montarLogo, coresPara, criarLista, criarMapa, preencherStats, classeSituacao, esc, fmt } from './ui.js';
+import { montarLogo, coresPara, criarLista, criarMapa, preencherStats, classeSituacao, esc, fmt, resumoDefinicao } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 const LIMITE_LISTA = 30;
@@ -81,6 +81,7 @@ function selecionar(cargo, uf, cidade = '') {
 
 function desenhar(r) {
   const proporcional = CARGOS[r.cargo].proporcional;
+  const eleitos = r.candidatos.filter((c) => c.eleito).length;
   let lista = r.candidatos;
   const busca = semAcento(estado.busca);
   if (busca) lista = lista.filter((c) => semAcento(c.nome).includes(busca) || String(c.numero).includes(busca));
@@ -93,7 +94,13 @@ function desenhar(r) {
   $('nota-lista').hidden = !proporcional;
   $('nota-lista').textContent = busca
     ? `${lista.length} resultado(s) para "${estado.busca}"`
-    : `Mostrando ${lista.length} de ${fmt.int(r.candidatos.length)} candidatos · ${r.vagas} vagas.`;
+    : `Mostrando ${lista.length} de ${fmt.int(r.candidatos.length)} candidatos · ${r.vagas} vagas.${eleitos ? ` ${eleitos} de ${r.vagas} eleitos.` : ''}`;
+  const definicao = proporcional ? null : resumoDefinicao(r.candidatos);
+  $('faixa-resultado').hidden = !definicao;
+  if (definicao) {
+    $('faixa-resultado').className = `faixa-resultado ${definicao.classe}`;
+    $('faixa-resultado').textContent = definicao.texto;
+  }
 }
 $('quantos').addEventListener('change', () => ultimo && desenhar(ultimo));
 
@@ -168,5 +175,5 @@ selecionar('presidente', 'BR');
 atualizarDestaques();
 setInterval(atualizar, fonte.intervaloMs);
 // Mapa (27 consultas na fonte TSE) e destaques atualizam em ritmo mais lento.
-setInterval(atualizarMapaEstados, Math.max(5000, fonte.intervaloMs));
+setInterval(atualizarMapaEstados, fonte.id === 'tse' ? 30000 : 5000);
 setInterval(atualizarDestaques, Math.max(3000, fonte.intervaloMs));

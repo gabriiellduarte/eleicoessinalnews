@@ -15,7 +15,7 @@
     <header class="t-topo">
       <div class="t-logo"><img id="logo" alt="Sinal News"></div>
       <div class="t-titulo">
-        <div class="t-kicker">ELEIÇÕES 2026 · APURAÇÃO · <span id="turno"></span>º TURNO</div>
+        <div class="t-kicker">ELEIÇÕES 2026 · APURAÇÃO · <span id="turno"></span>º TURNO <span class="selo-sim" id="selo-sim" hidden>SIMULAÇÃO · VOTOS FICTÍCIOS</span></div>
         <h1 id="t-titulo"></h1>
       </div>
       <div class="t-dir">
@@ -28,9 +28,10 @@
       <section id="cena-cargo" hidden>
         <div class="duelo" id="duelo"></div>
         <div class="t-lado">
-          <div class="t-painel" style="flex:1">
+          <div class="faixa-resultado" id="faixa-resultado" hidden></div>
+          <div class="t-painel painel-lista" style="flex:1">
             <h2>Demais candidatos</h2>
-            <ul class="lista" id="demais"></ul>
+            <div class="rol-janela"><ul class="lista" id="demais"></ul></div>
           </div>
           <div class="t-painel">
             <div class="numeros">
@@ -60,7 +61,7 @@
       <section id="cena-lista" hidden>
         <div class="t-painel">
           <h2 id="ranking-titulo"></h2>
-          <ul class="lista ranking" id="ranking"></ul>
+          <div class="ranking-janela"><ul class="lista ranking" id="ranking"></ul></div>
         </div>
       </section>
 
@@ -80,10 +81,9 @@
       <div class="ticker"><div class="ticker-faixa" id="ticker"></div></div>
     </footer>
 
-    <div class="selo-sim" id="selo-sim" hidden>SIMULAÇÃO · VOTOS FICTÍCIOS</div>
     <div class="t-erro" id="t-erro" hidden></div>
     <div class="ajuda" id="ajuda" hidden>
-      <div><kbd>C</kbd> painel de controle (estado, cidade, cenas, destaques)</div>
+      <div><kbd>C</kbd> painel de controle sobre o telão (o normal é usar o celular ou /controle)</div>
       <div><kbd>←</kbd><kbd>→</kbd> trocar de cena · <kbd>1</kbd>–<kbd>7</kbd> ir direto</div>
       <div><kbd>Espaço</kbd> pausar / retomar o rodízio</div>
       <div><kbd>F</kbd> tela cheia</div>
@@ -92,7 +92,10 @@
     </div>
   </div>
 
-  <button type="button" class="t-engrenagem" id="abrir-painel" title="Painel de controle (C)">⚙ Controle</button>
+  <button type="button" class="t-engrenagem" id="tela-cheia" title="Tela cheia (F)" aria-label="Tela cheia">
+    <svg class="entrar" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    <svg class="sair" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+  </button>
   <aside class="t-gaveta" id="gaveta" hidden>
     <div class="t-gaveta-topo"><strong>Controle do telão</strong><button type="button" id="fechar-painel" aria-label="Fechar">✕</button></div>
     <div id="painel"></div>

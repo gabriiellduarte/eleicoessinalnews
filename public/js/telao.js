@@ -1,18 +1,21 @@
 // Modo telão: cenas em rodízio, pensado para 16:9 em tela cheia.
 // Comandado pelo painel (tecla C) ou pela página controle.html em outra janela.
 // URL: ?uf=CE · ?cidade=Aracati (só os votos da cidade) · ?tempo=15
-//      ?cena=presidente|mapa|governador|senador|depfederal|depestadual|destaques (fixa a cena)
+//      ?cena=presidente|mapa|governador|senador|depfederal|depestadual|destaques|cidade (fixa a cena)
 import { CONFIG } from './config.js';
 import { UFS, CARGOS, nomeLocal, tituloCargo } from './ufs.js';
 import { fonte } from './fontes/index.js';
-import { CENAS, estado, definir, aoMudar, cidadeAtiva, tituloDestaques } from './estado-telao.js';
-import { carregarDestaques, lerNumeros, rotuloCargo, textoPosicao } from './destaques.js';
+import { CENAS, estado, definir, aoMudar, pedirAoEntrar, tituloDestaques } from './estado-telao.js';
+import { carregarDestaques, rotuloCargo, textoPosicao } from './destaques.js';
+import { tipoDaCena, escopoDaCena, listaDaCena, DESENHO_ROLAGEM } from './lista-telao.js';
 import { montarPainel } from './painel.js';
-import { montarLogo, coresPara, corDaPaleta, corDoPartido, criarLista, criarMapa, preencherStats, avatarHtml, classeSituacao, esc, fmt } from './ui.js';
+import { montarLogo, coresPara, corDaPaleta, corDoPartido, criarLista, criarMapa, preencherStats, avatarHtml, classeSituacao, esc, fmt, resumoDefinicao } from './ui.js';
+
+// O telão sempre abre com o rodízio pausado: o operador liga pelo controle (ou barra de espaço).
+pedirAoEntrar({ rodizio: false });
 
 const $ = (id) => document.getElementById(id);
 const SECAO = { majoritario: 'cena-cargo', mapa: 'cena-mapa', proporcional: 'cena-lista', destaques: 'cena-destaques' };
-const NO_RANKING = 10;
 
 let cenaNoAr = estado.cena;
 let pedido = 0;
@@ -24,16 +27,11 @@ $('turno').textContent = CONFIG.turno;
 $('selo-sim').hidden = fonte.id !== 'sim';
 $('ajuda-sim').hidden = fonte.id !== 'sim';
 
-const cenaAtual = () => CENAS.find((c) => c.id === cenaNoAr);
-
-// De onde vêm os votos de cada cena, conforme estado/cidade escolhidos no painel.
-function escopo(cena) {
-  const cidade = cidadeAtiva();
-  if (cena.tipo === 'mapa') return { uf: 'BR', cidade: '' };
-  if (cena.tipo === 'destaques') return { uf: estado.uf, cidade: estado.cidade };
-  if (CARGOS[cena.cargo].nacional && estado.abrangencia === 'br') return { uf: 'BR', cidade: '' };
-  return { uf: estado.uf, cidade };
-}
+// A cena no ar, já com o tipo de desenho que vale agora (ex.: Governador em "lista completa").
+const cenaAtual = () => {
+  const cena = CENAS.find((c) => c.id === cenaNoAr);
+  return { ...cena, tipo: tipoDaCena(cena) };
+};
 
 // --- cartões grandes dos primeiros colocados --------------------------------
 function atualizarDuelo(candidatos, cor) {
@@ -66,40 +64,62 @@ function atualizarDuelo(candidatos, cor) {
     const sit = el.querySelector('.sit');
     sit.textContent = c.situacao || '';
     sit.className = `sit ${classeSituacao(c)}`;
+    el.classList.toggle('destaque-eleito', classeSituacao(c) === 'eleito');
+    el.classList.toggle('destaque-turno2', classeSituacao(c) === 'turno2');
   });
   while (duelo.children.length > candidatos.length) duelo.lastChild.remove();
 }
 
-// --- candidatos em destaque (deputados da cidade) ---------------------------
+// --- candidatos em destaque ---------------------------------------------------
+// Os cartões só são refeitos quando muda a lista de candidatos; nas demais atualizações
+// trocam-se apenas os números, para fotos e animações não recomeçarem.
+let assinaturaLocais = '';
 function atualizarLocais({ itens, naoEncontrados }, uf, cidade) {
   const el = $('locais');
-  el.dataset.qtd = Math.min(itens.length, 9);
-  if (!itens.length) {
-    el.innerHTML = `<p class="t-vazio">Nenhum candidato em destaque encontrado${naoEncontrados.length ? ` (números: ${esc(naoEncontrados.join(', '))})` : ''}.<br>Escolha os candidatos no painel de controle (tecla C).</p>`;
+  const visiveis = itens.slice(0, 9);
+  el.dataset.qtd = visiveis.length;
+  if (!visiveis.length) {
+    assinaturaLocais = '';
+    el.innerHTML = `<p class="t-vazio">Nenhum candidato em destaque encontrado${naoEncontrados.length ? ` (números: ${esc(naoEncontrados.join(', '))})` : ''}.<br>Escolha os candidatos no controle (seção "Candidatos em destaque").</p>`;
     return;
   }
-  el.innerHTML = itens
-    .slice(0, 9)
-    .map((item, i) => {
-      const { cargo, cand, onde, naCidade, cidadeDisponivel } = item;
-      const votosCidade = naCidade
-        ? `<b>${fmt.int(naCidade.votos)}</b><span>votos em ${esc(cidade)} · ${fmt.pct(naCidade.pct)} dos válidos</span>`
-        : `<b>–</b><span>${cidadeDisponivel ? `sem votos em ${esc(cidade)}` : `votos em ${esc(cidade)} indisponíveis`}</span>`;
-      return `
-      <article class="local" style="--cor:${corDoPartido(cand.partido) || corDaPaleta(i)}">
+  const assinatura = `${visiveis.map((i) => `${i.cargo}|${i.cand.numero}`).join(',')}|${uf}|${cidade}`;
+  if (assinatura !== assinaturaLocais || el.children.length !== visiveis.length) {
+    assinaturaLocais = assinatura;
+    el.innerHTML = visiveis
+      .map(
+        ({ cargo, cand }, i) => `
+      <article class="local" style="--cor:${corDoPartido(cand.partido) || corDaPaleta(i)}; --ordem:${i}">
         <div class="avatar">${avatarHtml(cand)}</div>
         <div class="local-info">
           <div class="local-cargo">${esc(rotuloCargo(cargo))} · ${esc(cand.partido)} · ${esc(cand.numero)}</div>
           <div class="local-nome">${esc(cand.nome)}</div>
-          <span class="sit ${classeSituacao(cand)}">${esc(cand.situacao || '')}</span>
+          <span class="sit"></span>
         </div>
         <div class="local-nums">
-          <div><b>${fmt.int(cand.votos)}</b><span>votos · ${esc(onde)} · ${textoPosicao(item)}</span></div>
-          ${cidade ? `<div>${votosCidade}</div>` : ''}
+          <div><b data-f="votos"></b><span data-f="posicao"></span></div>
+          ${cidade ? '<div><b data-f="votosCidade"></b><span data-f="textoCidade"></span></div>' : ''}
         </div>
-      </article>`;
-    })
-    .join('');
+      </article>`,
+      )
+      .join('');
+  }
+  visiveis.forEach((item, i) => {
+    const { cand, onde, naCidade, cidadeDisponivel } = item;
+    const cartao = el.children[i];
+    const campo = (nome, texto) => {
+      const alvo = cartao.querySelector(`[data-f="${nome}"]`);
+      if (alvo && alvo.textContent !== texto) alvo.textContent = texto;
+    };
+    campo('votos', fmt.int(cand.votos));
+    campo('posicao', `votos · ${onde} · ${textoPosicao(item)}`);
+    campo('votosCidade', naCidade ? fmt.int(naCidade.votos) : '–');
+    campo('textoCidade', naCidade ? `votos em ${cidade} · ${fmt.pct(naCidade.pct)} dos válidos` : cidadeDisponivel ? `sem votos em ${cidade}` : `votos em ${cidade} indisponíveis`);
+    const sit = cartao.querySelector('.sit');
+    sit.textContent = cand.situacao || '';
+    sit.className = `sit ${classeSituacao(cand)}`;
+    cartao.classList.toggle('local-eleito', classeSituacao(cand) === 'eleito');
+  });
 }
 
 // --- placar de estados liderados (cena do mapa) -----------------------------
@@ -111,21 +131,46 @@ function atualizarLideres(mapa, nacional, cor) {
     if (lider?.votos > 0) estados[lider.numero] = (estados[lider.numero] || 0) + 1;
     else semVotos++;
   }
-  const blocos = Object.entries(estados)
+  const linhas = Object.entries(estados)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
-    .map(([numero, total]) => {
-      const c = nacional.candidatos.find((x) => String(x.numero) === numero);
-      return `<div class="lider" style="--cor:${cor(numero)}"><b>${total}</b><span>${esc(c?.nome || numero)}<small>${total === 1 ? 'estado' : 'estados'}</small></span></div>`;
-    });
-  if (semVotos) blocos.push(`<div class="lider sem"><b>${semVotos}</b><span>Aguardando<small>sem votos apurados</small></span></div>`);
-  $('t-lideres').innerHTML = blocos.join('');
+    .map(([numero, total]) => ({
+      chave: numero,
+      cor: cor(numero),
+      total,
+      nome: nacional.candidatos.find((x) => String(x.numero) === numero)?.nome || numero,
+      rotulo: total === 1 ? 'estado' : 'estados',
+    }));
+  if (semVotos) linhas.push({ chave: 'sem', total: semVotos, nome: 'Aguardando', rotulo: 'sem votos apurados' });
+
+  // Os blocos ficam fixos na tela: só o número e o texto mudam; a ordem só muda se alguém passar à frente.
+  const painel = $('t-lideres');
+  const blocos = linhas.map((l) => {
+    let el = painel.querySelector(`[data-lider="${l.chave}"]`);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = `lider${l.chave === 'sem' ? ' sem' : ''}`;
+      el.dataset.lider = l.chave;
+      el.innerHTML = '<b></b><span><em></em><small></small></span>';
+    }
+    if (l.cor) el.style.setProperty('--cor', l.cor);
+    const texto = (seletor, valor) => {
+      const alvo = el.querySelector(seletor);
+      if (alvo.textContent !== String(valor)) alvo.textContent = valor;
+    };
+    texto('b', l.total);
+    texto('em', l.nome);
+    texto('small', l.rotulo);
+    return el;
+  });
+  [...painel.children].forEach((el) => blocos.includes(el) || el.remove());
+  if (blocos.some((el, i) => painel.children[i] !== el)) blocos.forEach((el) => painel.appendChild(el));
 }
 
 // --- cenas -------------------------------------------------------------------
 function montarCena() {
   const cena = cenaAtual();
-  const { uf, cidade } = escopo(cena);
+  const { uf, cidade } = escopoDaCena(cena);
   let titulo = tituloCargo(cena.cargo, uf);
   let complemento = nomeLocal(uf, cidade);
   if (cena.tipo === 'mapa') titulo = 'Mapa da apuração';
@@ -134,13 +179,19 @@ function montarCena() {
   Object.entries(SECAO).forEach(([tipo, id]) => ($(id).hidden = tipo !== cena.tipo));
   // Listas novas a cada montagem: os candidatos mudam com a cena, o estado e a cidade.
   for (const id of ['duelo', 'demais', 't-legenda', 'ranking', 'locais']) $(id).innerHTML = '';
-  listas = { demais: criarLista($('demais')), legenda: criarLista($('t-legenda')), ranking: criarLista($('ranking')) };
+  listas = {
+    demais: criarLista($('demais')),
+    legenda: criarLista($('t-legenda')),
+    ranking: criarLista($('ranking')),
+  };
+  rol = null;
+  ranking = null;
 }
 
 async function atualizar() {
   const meu = ++pedido;
   const cena = cenaAtual();
-  const { uf, cidade } = escopo(cena);
+  const { uf, cidade } = escopoDaCena(cena);
   try {
     let r;
     if (cena.tipo === 'destaques') {
@@ -156,7 +207,9 @@ async function atualizar() {
       if (cena.tipo === 'majoritario') {
         // Os dois primeiros ficam nos cartões grandes; a lista segue a partir do 3º.
         atualizarDuelo(r.candidatos.slice(0, 2), cor);
-        listas.demais(r.candidatos.slice(2, 6), cor);
+        const demais = r.candidatos.slice(2);
+        listas.demais(demais, cor);
+        prepararRolagem([$('demais')], demais.length, DESENHO_ROLAGEM.majoritario.naTela);
       } else if (cena.tipo === 'mapa') {
         atualizarMapa(mapa, { modo: 'lider', cor });
         listas.legenda(r.candidatos.slice(0, 4), cor);
@@ -167,6 +220,13 @@ async function atualizar() {
       }
     }
     $('t-erro').hidden = true;
+    // Faixa "Eleito no 1º turno" / "2º turno" nas disputas de Presidente, Governador e Senador.
+    const definicao = r && !CARGOS[cena.cargo].proporcional && ['majoritario', 'proporcional'].includes(cena.tipo) ? resumoDefinicao(r.candidatos) : null;
+    $('faixa-resultado').hidden = !definicao;
+    if (definicao) {
+      $('faixa-resultado').className = `faixa-resultado ${definicao.classe}`;
+      $('faixa-resultado').textContent = definicao.texto;
+    }
     if (r) preencherStats(document, r);
     if (r?.fonte === 'tse') {
       $('selo-sim').hidden = !r.aguardando;
@@ -180,44 +240,79 @@ async function atualizar() {
   }
 }
 
-// --- lista de deputados, em páginas de 10 ---------------------------------------
-// Quantos entram na lista conforme a opção do painel ("vagas" = todos dentro do número de vagas).
-const LIMITE_DEPUTADOS = { top: 10, top20: 20, top30: 30, top50: 50 };
+// --- rolagem das listas (deputados, demais candidatos e resultado da cidade) ------
+// Toda lista fica montada inteira dentro de uma "janela" e desliza por ela, conforme a
+// opção do painel: páginas (pula de tela em tela), rolagem automática ou manual (controle).
 const MS_MINIMO_POR_PAGINA = 5000;
+const LINHAS_POR_SEGUNDO = 0.4; // velocidade da rolagem automática
+const PAUSA_ROLAGEM_MS = 2500; // parada no início e no fim da lista
+let rol = null; // { uls, linhas, naTela } da lista que está no ar
 let ranking = null; // último resultado recebido para a cena de deputados
-let paginasDaCena = 1;
+let duracaoMinimaCena = 0; // a cena fica no ar até a lista inteira passar
 let cenaDesde = Date.now();
 
-const msPorPagina = () => (estado.rodizio ? Math.max(MS_MINIMO_POR_PAGINA, (estado.tempo * 1000) / paginasDaCena) : 7000);
+const linhasExtras = () => (rol ? Math.max(0, rol.linhas - rol.naTela) : 0);
+const paginas = () => (rol ? Math.max(1, Math.ceil(rol.linhas / rol.naTela)) : 1);
+const msPorPagina = () => (estado.rodizio ? Math.max(MS_MINIMO_POR_PAGINA, (estado.tempo * 1000) / paginas()) : 7000);
+const paginaAtual = () => Math.floor((Date.now() - cenaDesde) / msPorPagina()) % paginas();
+
+function exigirDuracao(ms) {
+  if (Math.abs(ms - duracaoMinimaCena) < 500) return;
+  duracaoMinimaCena = ms;
+  agendarRodizio();
+}
+
+// Registra a lista que está no ar: `linhas` no total, `naTela` visíveis de cada vez.
+function prepararRolagem(uls, linhas, naTela) {
+  for (const ul of uls) ul.style.setProperty('--linha', `${ul.parentElement.clientHeight / naTela}px`);
+  rol = { uls, linhas, naTela };
+  const extras = linhasExtras();
+  if (!extras || estado.lista === 'manual') return exigirDuracao(0);
+  exigirDuracao(estado.lista === 'rolagem' ? 2 * PAUSA_ROLAGEM_MS + (extras / LINHAS_POR_SEGUNDO) * 1000 : paginas() * msPorPagina());
+}
+
+// Linha que deve estar no topo da janela agora.
+function linhaAtual() {
+  const extras = linhasExtras();
+  if (!extras) return 0;
+  if (estado.lista === 'manual') return Math.min(extras, Math.max(0, estado.listaPos || 0));
+  if (estado.lista === 'rolagem') {
+    const percurso = (extras / LINHAS_POR_SEGUNDO) * 1000;
+    const t = (Date.now() - cenaDesde) % (percurso + 2 * PAUSA_ROLAGEM_MS);
+    return Math.min(extras, Math.max(0, ((t - PAUSA_ROLAGEM_MS) / 1000) * LINHAS_POR_SEGUNDO));
+  }
+  return Math.min(extras, paginaAtual() * rol.naTela);
+}
+
+// Quadro a quadro: a rolagem automática desliza contínua; páginas e controle manual deslizam suave.
+function rolar() {
+  requestAnimationFrame(rolar);
+  if (!rol) return;
+  const linha = linhaAtual();
+  for (const ul of rol.uls) {
+    ul.classList.toggle('suave', estado.lista !== 'rolagem');
+    ul.style.transform = `translateY(calc(var(--linha) * ${(-linha).toFixed(3)}))`;
+  }
+}
+requestAnimationFrame(rolar);
 
 function desenharRanking() {
   if (!ranking || cenaAtual().tipo !== 'proporcional' || cenaAtual().cargo !== ranking.cargo) return;
   const { r, cargo, cor } = ranking;
-  // "Só os escolhidos": apenas os candidatos em destaque deste cargo, com a posição real.
-  const numeros = estado.deputados === 'escolhidos' ? lerNumeros(estado.destaques[cargo]) : [];
-  const escolhidos = r.candidatos.filter((c) => numeros.includes(String(c.numero)));
-  const limite = estado.deputados === 'vagas' ? r.vagas : LIMITE_DEPUTADOS[estado.deputados] || NO_RANKING;
-  const lista = escolhidos.length ? escolhidos : r.candidatos.slice(0, limite);
-  const paginas = Math.max(1, Math.ceil(lista.length / NO_RANKING));
-  if (paginas !== paginasDaCena) {
-    // A cena fica no ar o bastante para todas as páginas passarem.
-    paginasDaCena = paginas;
-    agendarRodizio();
-  }
-  const pagina = Math.floor((Date.now() - cenaDesde) / msPorPagina()) % paginas;
-  const rotulo = escolhidos.length ? `${escolhidos.length} candidato(s) escolhido(s)` : `${lista.length} mais votados`;
-  const paginacao = paginas > 1 ? ` · página ${pagina + 1} de ${paginas}` : '';
-  $('ranking-titulo').textContent = `${rotulo} · ${r.vagas} vagas · ${fmt.int(r.candidatos.length)} candidatos${paginacao}`;
-  listas.ranking(lista.slice(pagina * NO_RANKING, (pagina + 1) * NO_RANKING), cor, { teto: lista[0]?.pct });
+  const { lista, titulo } = listaDaCena(r, cargo);
+  listas.ranking(lista, cor, { teto: lista[0]?.pct });
+  prepararRolagem([$('ranking')], Math.ceil(lista.length / 2), DESENHO_ROLAGEM.proporcional.naTela);
+  const pagina = estado.lista === 'paginas' && paginas() > 1 ? ` · página ${paginaAtual() + 1} de ${paginas()}` : '';
+  $('ranking-titulo').textContent = titulo + pagina;
 }
-// Troca de página mesmo quando os dados só chegam de 30 em 30 segundos (fonte TSE).
+// Atualiza o "página x de y" mesmo quando os dados só chegam de 10 em 10 segundos (fonte TSE).
 setInterval(desenharRanking, 1000);
 
 let temporizador;
 function agendarRodizio() {
   clearTimeout(temporizador);
   if (!estado.rodizio) return;
-  const duracao = Math.max(estado.tempo * 1000, paginasDaCena * msPorPagina());
+  const duracao = Math.max(estado.tempo * 1000, duracaoMinimaCena);
   const restante = Math.max(1000, duracao - (Date.now() - cenaDesde));
   temporizador = setTimeout(() => mostrar(vizinha(1)), restante);
 }
@@ -235,8 +330,9 @@ function vizinha(passo, soAtivas = true) {
 function mostrar(id) {
   cenaNoAr = id;
   cenaDesde = Date.now();
-  paginasDaCena = 1;
+  duracaoMinimaCena = 0;
   ranking = null;
+  rol = null;
   if (estado.cena !== id) definir({ cena: id });
   const palco = $('cena');
   palco.classList.add('saindo');
@@ -244,13 +340,20 @@ function mostrar(id) {
     montarCena();
     await atualizar();
     palco.classList.remove('saindo');
+    // Entrada em cascata dos blocos da cena nova.
+    palco.classList.remove('entrando');
+    void palco.offsetWidth;
+    palco.classList.add('entrando');
+    // Terminada a entrada, nada mais é animado de novo a cada atualização dos números.
+    clearTimeout(mostrar.fimEntrada);
+    mostrar.fimEntrada = setTimeout(() => palco.classList.remove('entrando'), 1200);
   }, 400);
   agendarRodizio();
 }
 
 aoMudar((e, alteracao) => {
-  if (alteracao.cena && alteracao.cena !== cenaNoAr) return mostrar(alteracao.cena);
-  if (['uf', 'cidade', 'abrangencia', 'destaques', 'deputados'].some((k) => k in alteracao)) {
+  if (alteracao.cena && alteracao.cena !== cenaNoAr && CENAS.some((c) => c.id === alteracao.cena)) return mostrar(alteracao.cena);
+  if (['uf', 'cidade', 'abrangencia', 'destaques', 'deputados', 'lista', 'formato'].some((k) => k in alteracao)) {
     montarCena();
     atualizar();
   }
@@ -286,10 +389,22 @@ $('ticker').addEventListener('animationiteration', () => ($('ticker').innerHTML 
 // --- painel, relógio e teclado --------------------------------------------------
 montarPainel($('painel'), fonte);
 const alternarPainel = (abrir = $('gaveta').hidden) => ($('gaveta').hidden = !abrir);
-$('abrir-painel').addEventListener('click', () => alternarPainel(true));
 $('fechar-painel').addEventListener('click', () => alternarPainel(false));
 
-// O botão "Controle" só aparece enquanto o mouse se mexe, para não ir ao ar.
+// Tela cheia: só pode ser pedida por clique ou tecla no próprio computador do telão.
+function alternarTelaCheia() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+}
+$('tela-cheia').addEventListener('click', alternarTelaCheia);
+document.addEventListener('fullscreenchange', () => {
+  const cheia = !!document.fullscreenElement;
+  $('tela-cheia').classList.toggle('cheia', cheia);
+  $('tela-cheia').title = cheia ? 'Sair da tela cheia (F)' : 'Tela cheia (F)';
+  $('tela-cheia').setAttribute('aria-label', cheia ? 'Sair da tela cheia' : 'Tela cheia');
+});
+
+// O botão de tela cheia só aparece enquanto o mouse se mexe, para não ir ao ar.
 let ocultarMouse;
 addEventListener('mousemove', () => {
   document.body.classList.add('mouse');
@@ -311,10 +426,8 @@ addEventListener('keydown', (e) => {
     definir({ rodizio: !estado.rodizio });
   } else if (tecla === 'c') alternarPainel();
   else if (tecla === 'escape') alternarPainel(false);
-  else if (tecla === 'f') {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen?.();
-  } else if (tecla === 'h') $('ajuda').hidden = !$('ajuda').hidden;
+  else if (tecla === 'f') alternarTelaCheia();
+  else if (tecla === 'h') $('ajuda').hidden = !$('ajuda').hidden;
   else if (fonte.id === 'sim' && tecla === 'r') fonte.reiniciar();
   else if (fonte.id === 'sim' && (tecla === '+' || tecla === '=')) fonte.velocidade(2);
   else if (fonte.id === 'sim' && tecla === '-') fonte.velocidade(0.5);

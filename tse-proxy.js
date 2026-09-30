@@ -2,7 +2,7 @@
 // Evita CORS e excesso de requisições ao TSE quando muita gente acessa ao mesmo tempo.
 // Usado pelo server.js (computador do estúdio) e pela função api/tse.js (Vercel).
 const TSE_ORIGEM = process.env.TSE_ORIGEM || 'https://resultados.tse.jus.br';
-const CACHE_JSON_S = Number(process.env.TSE_CACHE_S || 20);
+const CACHE_JSON_S = Number(process.env.TSE_CACHE_S || 10);
 const CACHE_FOTO_S = 24 * 60 * 60;
 const JSON_UTF8 = 'application/json; charset=utf-8';
 

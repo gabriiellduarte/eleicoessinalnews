@@ -65,8 +65,40 @@ Mexer o mouse também mostra o botão "Controle" no canto.
   nome opcional; clique para incluir ou tirar. A cena mostra os votos de cada um, a posição e os votos na cidade.
 - **Simulação**: reiniciar e velocidade.
 
-O painel pode ficar em **outra janela** (`/controle`), por exemplo no monitor do operador enquanto o telão
-está no projetor. As duas janelas precisam estar **no mesmo navegador do mesmo computador**; as escolhas ficam salvas.
+### Controle pelo celular
+
+Com o servidor rodando no computador do telão (`iniciar.bat` ou `node server.js`), qualquer aparelho da **mesma rede
+Wi-Fi** comanda o telão: abra no celular o endereço que aparece no topo do painel e na janela do servidor, algo como
+`http://192.168.0.10:3000/controle`. Cena, estado, cidade, candidatos, rolagem e fonte dos dados mudam no telão na hora.
+
+- Na primeira vez o Windows pode perguntar se o Node pode usar a rede: marque "Redes privadas" e permita.
+- Quem estiver na mesma rede e souber o endereço consegue controlar; use a rede da emissora, não um Wi-Fi aberto.
+- **No site publicado na Vercel** o controle também funciona, por qualquer rede: abra `https://SEU-SITE.vercel.app/controle`
+  no celular. Lá os aparelhos consultam o estado de 2 em 2 segundos (em vez de receber na hora).
+  Para ficar confiável, ligue um banco Redis gratuito: no painel da Vercel, **Storage → Marketplace → Upstash (Redis)**,
+  conecte ao projeto e publique de novo. Ele cria sozinho as variáveis `KV_REST_API_URL` e `KV_REST_API_TOKEN`
+  (ou `UPSTASH_REDIS_REST_URL`/`_TOKEN`), que o `server.js` já reconhece. Sem o banco, a Vercel pode reiniciar a função e
+  o celular e o telão ficarem um tempo sem se enxergar; o painel avisa quando está sem banco.
+
+### Rolar a lista pelo controle
+
+Vale para todos os cargos: nos deputados rola a lista inteira; em Presidente, Governador e Senador rolam os
+"Demais candidatos" (os dois primeiros ficam fixos nos cartões grandes), ou a lista inteira no formato
+**Lista completa**.
+
+Na seção **Lista no ar** o controle mostra a mesma lista que está no telão. Rolar essa lista com o dedo move a lista
+do telão junto (cada duas linhas do controle = uma linha do telão). Presidente, Governador e Senador podem ir ao ar
+como **Lista completa** para mostrar todos os candidatos; nos deputados, escolha **Todos** para a lista inteira.
+
+### Fonte dos dados e atualização
+
+O padrão é **TSE oficial**: a tela busca os arquivos do TSE a cada 10 segundos. O painel tem o botão para trocar
+para **Simulação** (ensaio); a troca recarrega o telão e fica guardada no navegador.
+
+### Listas de deputados
+
+Quantidade: 10, 20, 30, 50, todas as vagas ou só os escolhidos. Acima de 10 nomes: páginas de 10, rolagem
+automática (sobe devagar e recomeça) ou rolagem manual (setas ▲ ▼ no controle). A cena fica no ar até a lista passar.
 
 Parâmetros de URL do telão: `?uf=CE`, `?cidade=Aracati`, `?tempo=15`, `?cena=destaques`, `?fonte=tse`.
 

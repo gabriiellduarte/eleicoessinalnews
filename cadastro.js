@@ -12,6 +12,9 @@ const ELEICAO = process.env.CAND_ELEICAO || '20322002026'; // Eleição Geral Fe
 // Eleição geral não lista municípios; a lista (com o código TSE) vem da municipal de 2024.
 const ELEICAO_MUNICIPIOS = process.env.CAND_ELEICAO_MUNICIPIOS || '2045202024';
 // Na Vercel só /tmp aceita escrita (e é temporário); o cache durável lá é o da rede (s-maxage).
+const RESULTADOS = process.env.TSE_RESULTADOS || 'https://resultados.tse.jus.br/oficial/ele2026';
+const ELEICAO_FEDERAL = process.env.TSE_FEDERAL || '6257';
+const ELEICAO_ESTADUAL = process.env.TSE_ESTADUAL || '6259';
 const PASTA = process.env.VERCEL ? '/tmp/apuracao-cache' : path.join(__dirname, 'cache');
 
 const CARGOS = { presidente: 1, governador: 3, senador: 5, depfederal: 6, depestadual: 7 };
@@ -72,6 +75,20 @@ function comCache(nome, validadeMs, produzir) {
   })().finally(() => emAndamento.delete(nome));
   emAndamento.set(nome, tarefa);
   return tarefa;
+}
+
+// No máximo 6 downloads de foto ao mesmo tempo, para o TSE não recusar por excesso.
+let emCurso = 0;
+const espera = [];
+async function naFila(tarefa) {
+  if (emCurso >= 6) await new Promise((ok) => espera.push(ok));
+  emCurso++;
+  try {
+    return await tarefa();
+  } finally {
+    emCurso--;
+    espera.shift()?.();
+  }
 }
 
 const codigoCargo = (cargo, uf) => (cargo === 'depestadual' && uf === 'DF' ? 8 : CARGOS[cargo]);
@@ -206,10 +223,23 @@ const rotas = {
       return json(lista);
     }),
 
-  foto: (uf, id) => comCache(`foto-${uf}-${id}.jpg`, 7 * DIA, () => baixar(`arquivo/img/${ELEICAO}/${id}/${uf}`, false)),
+  // Foto oficial: primeiro a do sistema de resultados (arquivo estático), depois a do DivulgaCandContas.
+  foto: (uf, id) =>
+    comCache(`foto-${uf}-${id}.jpg`, 7 * DIA, () =>
+      naFila(async () => {
+        try {
+          const eleicao = uf === 'BR' ? ELEICAO_FEDERAL : ELEICAO_ESTADUAL;
+          const r = await fetch(`${RESULTADOS}/${eleicao}/fotos/${uf.toLowerCase()}/${id}.jpeg`, { headers: CABECALHOS, signal: AbortSignal.timeout(20000) });
+          if (!r.ok || !(r.headers.get('content-type') || '').startsWith('image/')) throw new Error('sem foto nos resultados');
+          return Buffer.from(await r.arrayBuffer());
+        } catch {
+          return baixar(`arquivo/img/${ELEICAO}/${id}/${uf}`, false);
+        }
+      }),
+    ),
 };
 
-const semFoto = new Map(); // fotos que falharam: não insiste por 10 minutos
+const semFoto = new Map(); // fotos que falharam: não insiste por 1 minuto
 
 // /api/cadastro/candidatos/CE/depfederal · /vices/CE/governador · /municipios/CE · /foto/CE/123
 async function atender(caminho, res) {
@@ -231,7 +261,7 @@ async function atender(caminho, res) {
     });
     res.end(corpo);
   } catch (e) {
-    if (foto) semFoto.set(caminho, Date.now() + 10 * MIN);
+    if (foto) semFoto.set(caminho, Date.now() + MIN);
     res.writeHead(foto ? 404 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ erro: e.message }));
   }

@@ -1,10 +1,11 @@
 // Painel de controle do telão. Usado em dois lugares: sobreposto ao próprio
 // telão (tecla C) e na página controle.html, aberta em outro monitor.
 import { UFS, UF_POR_SIGLA, CARGOS, semAcento } from './ufs.js';
-import { CENAS, estado, definir, aoMudar, restaurarPadrao } from './estado-telao.js';
-import { criarMapa, esc } from './ui.js';
+import { CENAS, estado, definir, aoMudar, restaurarPadrao, rede, aoMudarRede } from './estado-telao.js';
+import { criarMapa, esc, fmt } from './ui.js';
 import { cadastro } from './fontes/cadastro.js';
 import { lerNumeros } from './destaques.js';
+import { tipoDaCena, escopoDaCena, itensRolaveis, DESENHO_ROLAGEM } from './lista-telao.js';
 
 const rotulo = (cargo) => CARGOS[cargo].abreviado || CARGOS[cargo].titulo;
 // Presidente é cadastrado no país; os demais cargos, no estado escolhido.
@@ -13,6 +14,20 @@ const ufDoCadastro = (cargo) => (CARGOS[cargo].nacional ? 'BR' : estado.uf);
 export function montarPainel(el, fonte) {
   el.classList.add('painel');
   el.innerHTML = `
+    <section>
+      <h3>Controle pelo celular</h3>
+      <p class="p-rede" data-rede></p>
+    </section>
+
+    <section>
+      <h3>Fonte dos dados</h3>
+      <div class="p-linha p-abr">
+        <button type="button" data-fonte="tse">TSE oficial (ao vivo)</button>
+        <button type="button" data-fonte="sim">Simulação (ensaio)</button>
+      </div>
+      <p class="p-dica">No modo TSE a tela busca os dados oficiais a cada 10 segundos. A simulação mostra votos fictícios e é só para ensaio. Trocar recarrega o telão.</p>
+    </section>
+
     <section>
       <h3>Cena no ar</h3>
       <div class="p-cenas">
@@ -51,6 +66,17 @@ export function montarPainel(el, fonte) {
     </section>
 
     <section>
+      <h3>Lista no ar</h3>
+      <p class="p-atual">Presidente, Governador e Senador:</p>
+      <div class="p-linha p-abr">
+        <button type="button" data-formato="destaque">2 em destaque</button>
+        <button type="button" data-formato="lista">Lista completa</button>
+      </div>
+      <p class="p-dica" data-espelho-aviso></p>
+      <ol class="p-espelho" data-espelho></ol>
+    </section>
+
+    <section>
       <h3>Candidatos em destaque</h3>
       <label>Título da cena <input type="text" data-dest="titulo" placeholder="Candidatos de (cidade)"></label>
       <p class="p-atual">Nas cenas Dep. Federal e Dep. Estadual, mostrar:</p>
@@ -60,9 +86,21 @@ export function montarPainel(el, fonte) {
         <button type="button" data-dep="top30">30</button>
         <button type="button" data-dep="top50">50</button>
         <button type="button" data-dep="vagas">Todas as vagas</button>
+        <button type="button" data-dep="todos">Todos</button>
         <button type="button" data-dep="escolhidos">Só os escolhidos</button>
       </div>
-      <p class="p-dica">Acima de 10 nomes a lista passa em páginas de 10, e a cena fica no ar até todas passarem. "Todas as vagas" mostra os mais votados até o número de cadeiras do estado.</p>
+      <p class="p-atual">Quando passar de 10 nomes:</p>
+      <div class="p-linha p-abr">
+        <button type="button" data-lista="paginas">Páginas de 10</button>
+        <button type="button" data-lista="rolagem">Rolagem automática</button>
+        <button type="button" data-lista="manual">Rolagem manual</button>
+      </div>
+      <div class="p-linha p-rolar">
+        <button type="button" data-rolar="topo" aria-label="Voltar ao início">⏮ Início</button>
+        <button type="button" data-rolar="-1" aria-label="Subir">▲ Subir</button>
+        <button type="button" data-rolar="1" aria-label="Descer">▼ Descer</button>
+      </div>
+      <p class="p-dica">"Todas as vagas" mostra os mais votados até o número de cadeiras do estado. Nas setas, cada toque move uma linha (dois candidatos) no telão; a cena fica no ar até a lista inteira passar.</p>
       <p class="p-atual">Escolhidos:</p>
       <ul class="p-escolhidos"></ul>
       <p class="p-atual">Lista oficial do TSE — clique para incluir ou tirar:</p>
@@ -203,6 +241,19 @@ export function montarPainel(el, fonte) {
     el.querySelectorAll('[data-ativa]').forEach((c) => (c.checked = estado.cenasAtivas.includes(c.dataset.ativa)));
     el.querySelectorAll('[data-abr]').forEach((b) => b.classList.toggle('ativo', b.dataset.abr === estado.abrangencia));
     el.querySelectorAll('[data-dep]').forEach((b) => b.classList.toggle('ativo', b.dataset.dep === estado.deputados));
+    el.querySelectorAll('[data-lista]').forEach((b) => b.classList.toggle('ativo', b.dataset.lista === (estado.lista || 'paginas')));
+    el.querySelectorAll('[data-fonte]').forEach((b) => b.classList.toggle('ativo', b.dataset.fonte === estado.fonte));
+    q('.p-rolar').hidden = estado.lista !== 'manual';
+    el.querySelectorAll('[data-formato]').forEach((b) => b.classList.toggle('ativo', b.dataset.formato === (estado.formato || 'destaque')));
+    // Computador do estúdio (localhost ou IP da rede): endereços da rede local.
+    // Site publicado (Hostinger, Vercel...): o próprio endereço do site.
+    const noEstudio = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+    const semBancoNaVercel = !rede.aoVivo && !rede.banco && /vercel\.app$/.test(location.hostname);
+    q('[data-rede]').innerHTML = !rede.ligada
+      ? 'Controle remoto indisponível neste endereço: vale apenas entre janelas do mesmo navegador.'
+      : noEstudio && rede.enderecos.length
+        ? `No celular, na mesma rede Wi-Fi, abra:<br>${rede.enderecos.map((e) => `<strong>${esc(e)}/controle</strong>`).join('<br>')}`
+        : `No celular, de qualquer rede, abra: <strong>${esc(location.origin)}/controle</strong><br>${semBancoNaVercel ? 'Sem banco de dados na Vercel, o controle remoto pode falhar de vez em quando (veja o README).' : 'Controle remoto ligado.'}`;
     q('[data-acao="rodizio"]').textContent = estado.rodizio ? '❚❚ Pausar rodízio' : '▶ Retomar rodízio';
     q('[data-acao="rodizio"]').classList.toggle('ativo', estado.rodizio);
     const definirValor = (campo, valor) => {
@@ -231,9 +282,16 @@ export function montarPainel(el, fonte) {
     else if (d.dep) definir({ deputados: d.dep });
     else if (d.acao === 'rodizio') definir({ rodizio: !estado.rodizio });
     else if (d.acao === 'padrao') restaurarPadrao();
-    else if (d.acao === 'reiniciar') fonte.reiniciar();
-    else if (d.acao === 'lento') fonte.velocidade(0.5);
-    else if (d.acao === 'rapido') fonte.velocidade(2);
+    else if (d.fonte) definir({ fonte: d.fonte });
+    else if (d.formato) definir({ formato: d.formato, listaPos: 0 });
+    else if (d.lista) definir({ lista: d.lista, listaPos: 0 });
+    else if (d.rolar) definir({ listaPos: d.rolar === 'topo' ? 0 : Math.max(0, (estado.listaPos || 0) + Number(d.rolar)) });
+    else if (d.acao === 'reiniciar' || d.acao === 'lento' || d.acao === 'rapido') {
+      if (d.acao === 'reiniciar') fonte.reiniciar();
+      else fonte.velocidade(d.acao === 'lento' ? 0.5 : 2);
+      // O relógio da simulação segue para os outros aparelhos (telão incluído).
+      definir({ sim: fonte.relogio() });
+    }
     sincronizar();
   });
 
@@ -268,6 +326,85 @@ export function montarPainel(el, fonte) {
   // As teclas digitadas nos campos não devem acionar os atalhos do telão.
   el.addEventListener('keydown', (e) => e.stopPropagation());
 
-  aoMudar(sincronizar);
+  // --- lista no ar: a mesma lista do telão, para rolar pelo controle ------------------
+  // Rolar esta lista move a do telão (nos deputados, uma linha do telão = dois candidatos daqui).
+  const ALTURA_ITEM = 44;
+  const espelho = q('[data-espelho]');
+  let rolandoPorCodigo = false;
+  let ultimoEnvio = 0;
+  let envioPendente = null;
+
+  let porLinha = 2; // candidatos por linha do telão na lista que está no ar
+
+  async function atualizarEspelho() {
+    const cena = CENAS.find((c) => c.id === estado.cena);
+    const aviso = q('[data-espelho-aviso]');
+    const tipo = cena && tipoDaCena(cena);
+    if (!DESENHO_ROLAGEM[tipo]) {
+      espelho.innerHTML = '';
+      aviso.textContent = 'A cena no ar não tem lista para rolar (mapa ou destaques).';
+      return;
+    }
+    const { uf, cidade } = escopoDaCena(cena);
+    const { cargo } = cena;
+    let r;
+    try {
+      r = await fonte.resultado(cargo, uf, cidade);
+    } catch {
+      aviso.textContent = 'Não foi possível carregar a lista.';
+      return;
+    }
+    if (cena.id !== estado.cena) return;
+    const { lista, titulo } = itensRolaveis(tipo, r, cargo);
+    const desenho = DESENHO_ROLAGEM[tipo];
+    porLinha = desenho.porLinha;
+    const linhas = Math.ceil(lista.length / porLinha);
+    const sobre = titulo;
+    aviso.textContent = linhas > desenho.naTela ? `${sobre}. Role a lista abaixo para mover o telão.` : `${sobre}. Cabem todos na tela; não há o que rolar.`;
+    espelho.dataset.porLinha = porLinha;
+    espelho.innerHTML = lista
+      .map((c) => `<li><b>${c.pos}º</b><span>${esc(c.nome)}<small>${esc(c.partido)} · ${esc(c.numero)}</small></span><em>${fmt.int(c.votos)}</em></li>`)
+      .join('');
+    posicionarEspelho();
+  }
+
+  // Leva a lista do controle até a linha que está no topo do telão.
+  function posicionarEspelho() {
+    if (estado.lista !== 'manual') return;
+    const alvo = (estado.listaPos || 0) * porLinha * ALTURA_ITEM;
+    if (Math.abs(espelho.scrollTop - alvo) < ALTURA_ITEM) return;
+    rolandoPorCodigo = true;
+    espelho.scrollTop = alvo;
+    setTimeout(() => (rolandoPorCodigo = false), 100);
+  }
+
+  espelho.addEventListener('scroll', () => {
+    if (rolandoPorCodigo) return;
+    const linha = Math.round(espelho.scrollTop / (porLinha * ALTURA_ITEM));
+    const enviar = () => {
+      envioPendente = null;
+      ultimoEnvio = Date.now();
+      if (estado.lista !== 'manual' || estado.listaPos !== linha) definir({ lista: 'manual', listaPos: linha });
+    };
+    // No máximo um envio a cada 150 ms enquanto o dedo arrasta.
+    clearTimeout(envioPendente);
+    if (Date.now() - ultimoEnvio > 150) enviar();
+    else envioPendente = setTimeout(enviar, 150);
+  });
+  setInterval(atualizarEspelho, Math.max(3000, fonte.intervaloMs));
+
+  aoMudar((e, alteracao, remoto) => {
+    if (remoto && alteracao.sim && fonte.definirRelogio) fonte.definirRelogio(alteracao.sim);
+    // Só a posição da rolagem mudou: basta acompanhar a lista (redesenhar o painel travaria o dedo).
+    if (Object.keys(alteracao).every((k) => k === 'listaPos' || k === 'lista')) {
+      el.querySelectorAll('[data-lista]').forEach((b) => b.classList.toggle('ativo', b.dataset.lista === estado.lista));
+      q('.p-rolar').hidden = estado.lista !== 'manual';
+      return posicionarEspelho();
+    }
+    sincronizar();
+    atualizarEspelho();
+  });
+  aoMudarRede(sincronizar);
   sincronizar();
+  atualizarEspelho();
 }

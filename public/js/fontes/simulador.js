@@ -321,4 +321,10 @@ export const simulador = {
     return vel;
   },
   velocidadeAtual: () => relogio.vel,
+  // Relógio da simulação, para o controle remoto levar reinício e velocidade ao telão.
+  relogio: () => ({ ...relogio }),
+  definirRelogio(novo) {
+    relogio = { t0: Number(novo.t0) || 0, vel: Number(novo.vel) || 1 };
+    gravarRelogio(relogio);
+  },
 };

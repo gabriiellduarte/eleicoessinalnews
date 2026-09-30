@@ -58,10 +58,26 @@ export function coresPara(chave, candidatos) {
 
 export const corDaPaleta = (i) => PALETA[i % (PALETA.length - 1)];
 
+// Classe visual da situação informada pelo TSE ("Eleito por QP", "Suplente", "2º turno"...).
 export function classeSituacao(c) {
+  const s = String(c.situacao || '');
   if (c.eleito) return 'eleito';
-  if (/2.? turno/i.test(c.situacao)) return 'turno2';
+  if (/2.? turno/i.test(s)) return 'turno2';
+  if (/suplente/i.test(s)) return 'suplente';
+  if (/n[aã]o eleit/i.test(s)) return 'naoeleito'; // escondido: poluiria listas com centenas de nomes
   return '';
+}
+
+// Resumo da disputa majoritária já definida: eleito(s) no 1º turno ou quem vai ao 2º turno.
+export function resumoDefinicao(candidatos) {
+  const eleitos = candidatos.filter((c) => c.eleito);
+  if (eleitos.length) {
+    const nomes = eleitos.map((c) => c.nome).join(' e ');
+    return { classe: 'eleito', texto: eleitos.length > 1 ? `Eleitos: ${nomes}` : `Eleito no 1º turno: ${nomes}` };
+  }
+  const segundo = candidatos.filter((c) => classeSituacao(c) === 'turno2');
+  if (segundo.length) return { classe: 'turno2', texto: `2º turno: ${segundo.map((c) => c.nome).join(' × ')}` };
+  return null;
 }
 
 export function avatarHtml(c) {
@@ -71,6 +87,8 @@ export function avatarHtml(c) {
 
 // Lista de candidatos com barras. Mantém as linhas entre atualizações para que
 // barras e trocas de posição sejam animadas.
+const COM_ANIMACAO = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export function criarLista(ul) {
   const linhas = new Map();
   // `teto` = percentual que enche a barra (padrão: 50% ou o do líder, o que for maior).
@@ -96,6 +114,8 @@ export function criarLista(ul) {
           </div>
           <div class="cand-num"><b class="cand-pct"></b><span class="cand-votos"></span></div>`;
         linhas.set(n, el);
+        // Entrada suave de quem acabou de aparecer na lista.
+        if (COM_ANIMACAO) el.animate([{ opacity: 0, transform: 'translateY(.6rem)' }, { opacity: 1, transform: 'none' }], { duration: 380, delay: Math.min(i, 9) * 35, easing: 'ease-out', fill: 'backwards' });
       }
       el.style.setProperty('--cor', cor(n));
       el.querySelector('.cand-pos').textContent = c.pos ?? i + 1;
@@ -105,8 +125,12 @@ export function criarLista(ul) {
       el.querySelector('.cand-pct').textContent = fmt.pct(c.pct);
       el.querySelector('.cand-votos').textContent = `${fmt.int(c.votos)} votos`;
       const sit = el.querySelector('.sit');
+      const classe = classeSituacao(c);
       sit.textContent = c.situacao || '';
-      sit.className = `sit ${classeSituacao(c)}`;
+      sit.className = `sit ${classe}`;
+      // A linha inteira de quem foi eleito (ou vai ao 2º turno) ganha destaque.
+      el.classList.toggle('cand-eleito', classe === 'eleito');
+      el.classList.toggle('cand-turno2', classe === 'turno2');
     });
 
     linhas.forEach((el, n) => {

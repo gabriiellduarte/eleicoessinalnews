@@ -1,9 +1,9 @@
 // Configuração central da apuração. Tudo que muda no dia da eleição está aqui.
 export const CONFIG = {
-  // 'sim' = votos simulados (ensaio) | 'tse' = dados oficiais do TSE
-  // No computador local abre a simulação; publicado na internet, sempre o TSE,
-  // para o público nunca ver votos fictícios. A URL pode forçar: ?fonte=tse ou ?fonte=sim
-  fonte: ['localhost', '127.0.0.1'].includes(location.hostname) ? 'sim' : 'tse',
+  // 'tse' = dados oficiais do TSE (padrão) | 'sim' = votos simulados, só para ensaio.
+  // Troca-se pelo painel de controle do telão ou pela URL (?fonte=sim / ?fonte=tse);
+  // a escolha fica guardada neste navegador.
+  fonte: 'tse',
 
   // Estado mostrado em Governador/Senador/Deputados por padrão (URL: ?uf=CE)
   ufDestaque: 'CE',
@@ -62,12 +62,18 @@ export const CONFIG = {
     municipios: {},
   },
 
-  atualizacao: { simMs: 1000, tseMs: 30000 },
+  // De quanto em quanto tempo a tela busca dados novos (o servidor guarda cada arquivo do TSE por 10 s).
+  atualizacao: { simMs: 1000, tseMs: 10000 },
 
   telao: { segundosPorCena: 15 },
 };
 
 const p = new URLSearchParams(location.search);
+let fonteSalva = null;
+try {
+  fonteSalva = localStorage.getItem('sinal-fonte');
+} catch {}
+if (fonteSalva === 'tse' || fonteSalva === 'sim') CONFIG.fonte = fonteSalva;
 if (p.get('fonte') === 'tse' || p.get('fonte') === 'sim') CONFIG.fonte = p.get('fonte');
 if (/^[a-zA-Z]{2}$/.test(p.get('uf') || '')) CONFIG.ufDestaque = p.get('uf').toUpperCase();
 if (Number(p.get('tempo')) > 0) CONFIG.telao.segundosPorCena = Number(p.get('tempo'));
