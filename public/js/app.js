@@ -15,8 +15,7 @@ let ultimo = null; // último resultado recebido, para a busca filtrar sem nova 
 
 montarLogo($('logo'));
 $('turno').textContent = CONFIG.turno;
-$('faixa-sim').hidden = fonte.id !== 'sim';
-$('fonte-dados').textContent = fonte.id === 'sim' ? 'Dados simulados para demonstração.' : 'Fonte: Tribunal Superior Eleitoral (TSE).';
+$('fonte-dados').textContent = 'Fonte: Tribunal Superior Eleitoral (TSE).';
 
 $('abas').innerHTML = Object.entries(CARGOS)
   .map(([id, c]) => `<button role="tab" data-cargo="${id}">${c.titulo}</button>`)
@@ -113,7 +112,6 @@ async function atualizar() {
     $('erro').hidden = !r.aguardando;
     $('erro').textContent = 'Aguardando o início da totalização pelo TSE. Os candidatos abaixo são os registrados oficialmente, em ordem alfabética.';
     ultimo = r;
-    $('aviso-cadastro').hidden = r.oficial !== false;
     desenhar(r);
     preencherStats(document, r);
   } catch (e) {
@@ -175,5 +173,5 @@ selecionar('presidente', 'BR');
 atualizarDestaques();
 setInterval(atualizar, fonte.intervaloMs);
 // Mapa (27 consultas na fonte TSE) e destaques atualizam em ritmo mais lento.
-setInterval(atualizarMapaEstados, fonte.id === 'tse' ? 30000 : 5000);
+setInterval(atualizarMapaEstados, 30000);
 setInterval(atualizarDestaques, Math.max(3000, fonte.intervaloMs));

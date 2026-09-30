@@ -32,8 +32,7 @@ Na primeira vez ele pede login e cria o projeto (aceite as opções padrão). Pa
 npx vercel --prod
 ```
 
-- Publicado, o site abre sempre no **modo TSE** (candidatos oficiais zerados até a apuração começar). A simulação
-  só aparece com `?fonte=sim` no endereço.
+- O site usa só os dados oficiais do TSE, ao vivo (candidatos zerados até a apuração começar).
 - Na Vercel não há disco permanente: quem segura a carga é o cache da própria rede (20 s para os resultados,
   10 min para candidatos). Se o TSE recusar acessos vindos da Vercel, use o `iniciar.bat` no computador do estúdio
   para o telão.
@@ -51,9 +50,8 @@ Cenas: 1 Presidente, 2 Mapa Brasil, 3 Governador, 4 Senador, 5 Dep. Federal, 6 D
 | `Espaço` | pausar / retomar o rodízio |
 | `F` | tela cheia |
 | `H` | ajuda na tela |
-| `R`, `+`, `-` | reiniciar / acelerar / desacelerar a simulação |
 
-Mexer o mouse também mostra o botão "Controle" no canto.
+Mexer o mouse mostra o botão de tela cheia no canto de baixo.
 
 ### Painel de controle
 
@@ -63,13 +61,12 @@ Mexer o mouse também mostra o botão "Controle" no canto.
   cidades do estado, com filtro.
 - **Candidatos em destaque**: lista oficial do TSE filtrada por cargo (os cinco) e por partido, com filtro de
   nome opcional; clique para incluir ou tirar. A cena mostra os votos de cada um, a posição e os votos na cidade.
-- **Simulação**: reiniciar e velocidade.
 
 ### Controle pelo celular
 
 Com o servidor rodando no computador do telão (`iniciar.bat` ou `node server.js`), qualquer aparelho da **mesma rede
 Wi-Fi** comanda o telão: abra no celular o endereço que aparece no topo do painel e na janela do servidor, algo como
-`http://192.168.0.10:3000/controle`. Cena, estado, cidade, candidatos, rolagem e fonte dos dados mudam no telão na hora.
+`http://192.168.0.10:3000/controle`. Cena, estado, cidade, candidatos e rolagem mudam no telão na hora.
 
 - Na primeira vez o Windows pode perguntar se o Node pode usar a rede: marque "Redes privadas" e permita.
 - Quem estiver na mesma rede e souber o endereço consegue controlar; use a rede da emissora, não um Wi-Fi aberto.
@@ -92,15 +89,14 @@ como **Lista completa** para mostrar todos os candidatos; nos deputados, escolha
 
 ### Fonte dos dados e atualização
 
-O padrão é **TSE oficial**: a tela busca os arquivos do TSE a cada 10 segundos. O painel tem o botão para trocar
-para **Simulação** (ensaio); a troca recarrega o telão e fica guardada no navegador.
+Só **TSE oficial, ao vivo**: a tela busca os arquivos do TSE a cada 10 segundos.
 
 ### Listas de deputados
 
 Quantidade: 10, 20, 30, 50, todas as vagas ou só os escolhidos. Acima de 10 nomes: páginas de 10, rolagem
 automática (sobe devagar e recomeça) ou rolagem manual (setas ▲ ▼ no controle). A cena fica no ar até a lista passar.
 
-Parâmetros de URL do telão: `?uf=CE`, `?cidade=Aracati`, `?tempo=15`, `?cena=destaques`, `?fonte=tse`.
+Parâmetros de URL do telão: `?uf=CE`, `?cidade=Aracati`, `?tempo=15`, `?cena=destaques`.
 
 ## Cadastro oficial (candidatos e cidades)
 
@@ -121,25 +117,14 @@ No painel do telão, escolha o cargo (e o partido, se quiser) e clique nos candi
 Para deixar fixo (e aparecer no cartão da página pública), preencha os números de urna no bloco `destaques`
 de `public/js/config.js`.
 
-## Simulação
-
-Candidatos e cidades são os **oficiais**; os **votos são fictícios**, sorteados a partir do número de cada
-candidato. Não são resultado, pesquisa nem previsão, e a tela mostra o selo "SIMULAÇÃO". Use só para ensaio:
-não divulgue a página pública nesse modo.
-
-A apuração vai de 0% a 100% em 8 minutos e recomeça (`sim` em `public/js/config.js`). Nos deputados, a
-simulação marca como eleitos os mais votados até o número de vagas (a regra real usa o quociente partidário).
-Se o cadastro do TSE estiver inacessível, a simulação cai para nomes fictícios.
-
 ## Conectar os resultados do TSE
 
 Tudo em `public/js/config.js`:
 
-1. `fonte: 'tse'` (ou abra as páginas com `?fonte=tse` para testar sem mexer no arquivo)
-2. `tse.eleicao`: já preenchido com `6257` (Eleição Geral Federal) e `6259` (Eleições Gerais Estaduais).
-3. `tse.ambiente`: `oficial`.
+1. `tse.eleicao`: já preenchido com `6257` (Eleição Geral Federal) e `6259` (Eleições Gerais Estaduais).
+2. `tse.ambiente`: `oficial`.
 
-Enquanto o TSE não publica os arquivos, o modo `tse` mostra os candidatos oficiais com zero voto e o aviso
+Enquanto o TSE não começa a totalizar, o site mostra os candidatos oficiais com zero voto e o aviso
 "Aguardando o início da totalização". Quando os arquivos aparecerem, os votos entram sozinhos. Se uma consulta
 falhar no meio da apuração, a tela mantém o último resultado bom.
 

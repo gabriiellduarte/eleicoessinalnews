@@ -1,5 +1,5 @@
 // Fonte de dados OFICIAL: arquivos JSON de resultados do TSE.
-// Converte os dois layouts conhecidos para o mesmo formato do simulador:
+// Converte os dois layouts conhecidos para o formato usado pelas telas:
 //   2024: {raiz}/dados/{uf}/{uf}{mun}-c{cargo}-e{eleicao}-u.json
 //   2022: {raiz}/dados-simplificados/{uf}/{uf}{mun}-c{cargo}-e{eleicao}-r.json
 //   ({mun} = código TSE do município; vazio para o resultado do estado/país)

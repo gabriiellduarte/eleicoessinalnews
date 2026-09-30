@@ -203,6 +203,31 @@ async function montarCandidatos(uf, cargo) {
   }));
 }
 
+// --- municípios ------------------------------------------------------------------
+// Cópia da lista de municípios guardada no projeto (dados/municipios-2026.json), usada se o TSE falhar.
+let MUNICIPIOS_DO_PROJETO = {};
+try {
+  MUNICIPIOS_DO_PROJETO = JSON.parse(fs.readFileSync(path.join(__dirname, 'dados', 'municipios-2026.json'), 'utf8'));
+} catch {}
+
+// Lista de todos os municípios do país, do arquivo de configuração da eleição estadual:
+// { CE: [{ nome, codigo }], ... }. Um arquivo só (500 KB) serve para todos os estados.
+async function municipiosDoResultado() {
+  const bruto = await comCache('municipios-resultados.json', 7 * DIA, async () => {
+    const eleicao = ELEICAO_ESTADUAL.padStart(6, '0');
+    const r = await fetch(`${RESULTADOS}/${ELEICAO_ESTADUAL}/config/mun-e${eleicao}-cm.json`, { headers: CABECALHOS, signal: AbortSignal.timeout(30000) });
+    if (!r.ok || (r.headers.get('content-type') || '').includes('text/html')) throw new Error(`TSE respondeu ${r.status}`);
+    const d = await r.json();
+    const porUf = {};
+    for (const abr of d.abr || []) {
+      porUf[String(abr.cd).toUpperCase()] = (abr.mu || []).map((m) => ({ nome: m.nm, codigo: String(m.cd) }));
+    }
+    if (!Object.keys(porUf).length) throw new Error('arquivo de municípios veio vazio');
+    return json(porUf);
+  });
+  return JSON.parse(bruto);
+}
+
 const rotas = {
   // [{ numero, nome, partido, id, vice }] — candidatos aptos a receber votos
   candidatos: (uf, cargo) => comCache(`candidatos-${uf}-${cargo}.json`, 15 * MIN, async () => json(await montarCandidatos(uf, cargo))),
@@ -214,12 +239,20 @@ const rotas = {
   },
 
   // [{ nome, codigo }] — código TSE do município (não é o do IBGE)
+  // Três fontes, em ordem: a configuração do sistema de resultados do TSE (arquivo estático,
+  // acessível também de servidores na nuvem), o DivulgaCandContas (que recusa acessos vindos
+  // da Vercel e de outras nuvens) e, por último, a cópia que acompanha o projeto.
   municipios: (uf) =>
     comCache(`municipios-${uf}.json`, 7 * DIA, async () => {
-      if (uf === 'DF') return json([{ nome: 'BRASÍLIA', codigo: '97012' }]);
-      const d = await baixar(`v1/eleicao/buscar/${uf}/${ELEICAO_MUNICIPIOS}/municipios`);
-      const lista = (d.municipios || []).map((m) => ({ nome: m.nome, codigo: String(m.codigo) }));
-      if (!lista.length) throw new Error(`lista de municípios de ${uf} veio vazia`);
+      const todos = await municipiosDoResultado().catch((e) => (console.warn(`[cadastro] municípios (resultados): ${e.message}`), null));
+      let lista = todos?.[uf];
+      if (!lista?.length && uf !== 'DF') {
+        lista = await baixar(`v1/eleicao/buscar/${uf}/${ELEICAO_MUNICIPIOS}/municipios`)
+          .then((d) => (d.municipios || []).map((m) => ({ nome: m.nome, codigo: String(m.codigo) })))
+          .catch((e) => (console.warn(`[cadastro] municípios (DivulgaCandContas): ${e.message}`), null));
+      }
+      if (!lista?.length) lista = MUNICIPIOS_DO_PROJETO[uf]?.map(([nome, codigo]) => ({ nome, codigo }));
+      if (!lista?.length) throw new Error(`lista de municípios de ${uf} indisponível`);
       return json(lista);
     }),
 

@@ -20,15 +20,6 @@ export function montarPainel(el, fonte) {
     </section>
 
     <section>
-      <h3>Fonte dos dados</h3>
-      <div class="p-linha p-abr">
-        <button type="button" data-fonte="tse">TSE oficial (ao vivo)</button>
-        <button type="button" data-fonte="sim">Simulação (ensaio)</button>
-      </div>
-      <p class="p-dica">No modo TSE a tela busca os dados oficiais a cada 10 segundos. A simulação mostra votos fictícios e é só para ensaio. Trocar recarrega o telão.</p>
-    </section>
-
-    <section>
       <h3>Cena no ar</h3>
       <div class="p-cenas">
         ${CENAS.map((c, i) => `
@@ -113,16 +104,6 @@ export function montarPainel(el, fonte) {
       <input type="search" data-filtro="texto" placeholder="Filtrar por nome ou número (opcional)" aria-label="Filtrar candidatos">
       <ul class="p-lista" data-lista="candidatos"></ul>
       <p class="p-status" data-status="candidatos"></p>
-    </section>
-
-    <section ${fonte.id === 'sim' ? '' : 'hidden'}>
-      <h3>Simulação</h3>
-      <div class="p-linha">
-        <button type="button" data-acao="reiniciar">Reiniciar apuração</button>
-        <button type="button" data-acao="lento">−</button>
-        <span data-vel></span>
-        <button type="button" data-acao="rapido">+</button>
-      </div>
     </section>
 
     <section>
@@ -242,7 +223,6 @@ export function montarPainel(el, fonte) {
     el.querySelectorAll('[data-abr]').forEach((b) => b.classList.toggle('ativo', b.dataset.abr === estado.abrangencia));
     el.querySelectorAll('[data-dep]').forEach((b) => b.classList.toggle('ativo', b.dataset.dep === estado.deputados));
     el.querySelectorAll('[data-lista]').forEach((b) => b.classList.toggle('ativo', b.dataset.lista === (estado.lista || 'paginas')));
-    el.querySelectorAll('[data-fonte]').forEach((b) => b.classList.toggle('ativo', b.dataset.fonte === estado.fonte));
     q('.p-rolar').hidden = estado.lista !== 'manual';
     el.querySelectorAll('[data-formato]').forEach((b) => b.classList.toggle('ativo', b.dataset.formato === (estado.formato || 'destaque')));
     // Computador do estúdio (localhost ou IP da rede): endereços da rede local.
@@ -267,7 +247,6 @@ export function montarPainel(el, fonte) {
     else mostrarCidades();
     mostrarCandidatos();
     mostrarEscolhidos();
-    if (fonte.velocidadeAtual) q('[data-vel]').textContent = `${fonte.velocidadeAtual()}×`;
   }
 
   el.addEventListener('click', (e) => {
@@ -282,16 +261,9 @@ export function montarPainel(el, fonte) {
     else if (d.dep) definir({ deputados: d.dep });
     else if (d.acao === 'rodizio') definir({ rodizio: !estado.rodizio });
     else if (d.acao === 'padrao') restaurarPadrao();
-    else if (d.fonte) definir({ fonte: d.fonte });
     else if (d.formato) definir({ formato: d.formato, listaPos: 0 });
     else if (d.lista) definir({ lista: d.lista, listaPos: 0 });
     else if (d.rolar) definir({ listaPos: d.rolar === 'topo' ? 0 : Math.max(0, (estado.listaPos || 0) + Number(d.rolar)) });
-    else if (d.acao === 'reiniciar' || d.acao === 'lento' || d.acao === 'rapido') {
-      if (d.acao === 'reiniciar') fonte.reiniciar();
-      else fonte.velocidade(d.acao === 'lento' ? 0.5 : 2);
-      // O relógio da simulação segue para os outros aparelhos (telão incluído).
-      definir({ sim: fonte.relogio() });
-    }
     sincronizar();
   });
 
@@ -394,7 +366,6 @@ export function montarPainel(el, fonte) {
   setInterval(atualizarEspelho, Math.max(3000, fonte.intervaloMs));
 
   aoMudar((e, alteracao, remoto) => {
-    if (remoto && alteracao.sim && fonte.definirRelogio) fonte.definirRelogio(alteracao.sim);
     // Só a posição da rolagem mudou: basta acompanhar a lista (redesenhar o painel travaria o dedo).
     if (Object.keys(alteracao).every((k) => k === 'listaPos' || k === 'lista')) {
       el.querySelectorAll('[data-lista]').forEach((b) => b.classList.toggle('ativo', b.dataset.lista === estado.lista));

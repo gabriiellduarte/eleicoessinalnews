@@ -24,8 +24,6 @@ const atualizarMapa = criarMapa($('t-mapa'));
 
 montarLogo($('logo'));
 $('turno').textContent = CONFIG.turno;
-$('selo-sim').hidden = fonte.id !== 'sim';
-$('ajuda-sim').hidden = fonte.id !== 'sim';
 
 // A cena no ar, já com o tipo de desenho que vale agora (ex.: Governador em "lista completa").
 const cenaAtual = () => {
@@ -228,11 +226,8 @@ async function atualizar() {
       $('faixa-resultado').textContent = definicao.texto;
     }
     if (r) preencherStats(document, r);
-    if (r?.fonte === 'tse') {
-      $('selo-sim').hidden = !r.aguardando;
-      $('selo-sim').textContent = 'AGUARDANDO O INÍCIO DA TOTALIZAÇÃO · TSE';
-    }
-    if (r?.fonte === 'sim') $('selo-sim').textContent = r.oficial === false ? 'SIMULAÇÃO · TSE INDISPONÍVEL: NOMES E VOTOS FICTÍCIOS' : 'SIMULAÇÃO · VOTOS FICTÍCIOS';
+    // Selo "Aguardando" até o TSE totalizar a primeira seção.
+    if (r) $('selo-status').hidden = !r.aguardando;
   } catch (e) {
     if (meu !== pedido) return;
     $('t-erro').hidden = false;
@@ -428,9 +423,6 @@ addEventListener('keydown', (e) => {
   else if (tecla === 'escape') alternarPainel(false);
   else if (tecla === 'f') alternarTelaCheia();
   else if (tecla === 'h') $('ajuda').hidden = !$('ajuda').hidden;
-  else if (fonte.id === 'sim' && tecla === 'r') fonte.reiniciar();
-  else if (fonte.id === 'sim' && (tecla === '+' || tecla === '=')) fonte.velocidade(2);
-  else if (fonte.id === 'sim' && tecla === '-') fonte.velocidade(0.5);
 });
 
 montarCena();

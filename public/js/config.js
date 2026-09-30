@@ -1,10 +1,5 @@
 // Configuração central da apuração. Tudo que muda no dia da eleição está aqui.
 export const CONFIG = {
-  // 'tse' = dados oficiais do TSE (padrão) | 'sim' = votos simulados, só para ensaio.
-  // Troca-se pelo painel de controle do telão ou pela URL (?fonte=sim / ?fonte=tse);
-  // a escolha fica guardada neste navegador.
-  fonte: 'tse',
-
   // Estado mostrado em Governador/Senador/Deputados por padrão (URL: ?uf=CE)
   ufDestaque: 'CE',
   turno: 1,
@@ -32,16 +27,6 @@ export const CONFIG = {
   // A eleição consultada é definida no servidor (cadastro.js).
   cadastro: { base: '/api/cadastro' },
 
-  sim: {
-    duracaoMin: 8, // tempo para a apuração simulada ir de 0% a 100%
-    pausaFinalSeg: 60, // tempo parado em 100% antes de recomeçar
-    // Roteiro do ensaio: percentual aproximado dos votos válidos, por número de urna.
-    // Quem não estiver aqui divide o restante por sorteio. Vale só para a simulação.
-    roteiro: {
-      presidente: { 22: 46 }, // 22 = Flavio Bolsonaro (PL) na frente
-    },
-  },
-
   tse: {
     // Com o server.js rodando, '/api/tse' é o proxy com cache.
     // Em hospedagem estática, use 'https://resultados.tse.jus.br' (depende de CORS do TSE).
@@ -63,17 +48,11 @@ export const CONFIG = {
   },
 
   // De quanto em quanto tempo a tela busca dados novos (o servidor guarda cada arquivo do TSE por 10 s).
-  atualizacao: { simMs: 1000, tseMs: 10000 },
+  atualizacao: { tseMs: 10000 },
 
   telao: { segundosPorCena: 15 },
 };
 
 const p = new URLSearchParams(location.search);
-let fonteSalva = null;
-try {
-  fonteSalva = localStorage.getItem('sinal-fonte');
-} catch {}
-if (fonteSalva === 'tse' || fonteSalva === 'sim') CONFIG.fonte = fonteSalva;
-if (p.get('fonte') === 'tse' || p.get('fonte') === 'sim') CONFIG.fonte = p.get('fonte');
 if (/^[a-zA-Z]{2}$/.test(p.get('uf') || '')) CONFIG.ufDestaque = p.get('uf').toUpperCase();
 if (Number(p.get('tempo')) > 0) CONFIG.telao.segundosPorCena = Number(p.get('tempo'));

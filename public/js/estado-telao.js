@@ -48,7 +48,6 @@ function daUrl() {
   if (p.get('cidade')) Object.assign(u, { cidade: p.get('cidade'), abrangencia: 'cidade' });
   if (Number(p.get('tempo')) > 0) u.tempo = Number(p.get('tempo'));
   if (CENAS.some((c) => c.id === p.get('cena'))) Object.assign(u, { cena: p.get('cena'), rodizio: false });
-  if (p.get('fonte') === 'tse' || p.get('fonte') === 'sim') u.fonte = p.get('fonte');
   return u;
 }
 const pedidoDaUrl = daUrl();
@@ -65,7 +64,7 @@ function carregar() {
   try {
     salvo = JSON.parse(localStorage.getItem(CHAVE) || '{}');
   } catch {}
-  const e = { ...PADRAO, ...salvo, destaques: { ...PADRAO.destaques, ...salvo.destaques }, ...pedidoDaUrl, fonte: CONFIG.fonte };
+  const e = { ...PADRAO, ...salvo, destaques: { ...PADRAO.destaques, ...salvo.destaques }, ...pedidoDaUrl };
   if (!UF_POR_SIGLA[e.uf]) e.uf = PADRAO.uf;
   if (!CENAS.some((c) => c.id === e.cena)) e.cena = PADRAO.cena;
   return e;
@@ -84,15 +83,6 @@ function aplicar(alteracao, remoto) {
   try {
     localStorage.setItem(CHAVE, JSON.stringify(estado));
   } catch {}
-  // A fonte dos dados (simulação ou TSE) é escolhida ao carregar a página: trocar exige recarregar.
-  if (alteracao.fonte && alteracao.fonte !== CONFIG.fonte) {
-    try {
-      localStorage.setItem('sinal-fonte', alteracao.fonte);
-    } catch {}
-    const url = new URL(location.href);
-    url.searchParams.delete('fonte');
-    return location.replace(url);
-  }
   ouvintes.forEach((f) => f(estado, alteracao, remoto));
 }
 
