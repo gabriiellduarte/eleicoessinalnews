@@ -84,13 +84,18 @@ function desenhar(r) {
   let lista = r.candidatos;
   const busca = semAcento(estado.busca);
   if (busca) lista = lista.filter((c) => semAcento(c.nome).includes(busca) || String(c.numero).includes(busca));
-  if (proporcional) lista = lista.slice(0, LIMITE_LISTA);
+  // Deputados: quantos aparecem é escolha do leitor ("vagas" = número de cadeiras do estado).
+  const quantos = $('quantos').value;
+  const limite = quantos === 'todos' ? Infinity : quantos === 'vagas' ? r.vagas : Number(quantos) || LIMITE_LISTA;
+  if (proporcional) lista = lista.slice(0, limite);
   atualizarLista(lista, coresPara(`${r.cargo}|${r.uf}`, r.candidatos), proporcional ? { teto: r.candidatos[0]?.pct } : undefined);
+  $('quantos').hidden = !proporcional;
   $('nota-lista').hidden = !proporcional;
   $('nota-lista').textContent = busca
     ? `${lista.length} resultado(s) para "${estado.busca}"`
-    : `${LIMITE_LISTA} mais votados de ${fmt.int(r.candidatos.length)} candidatos · ${r.vagas} vagas. Use a busca para achar outros.`;
+    : `Mostrando ${lista.length} de ${fmt.int(r.candidatos.length)} candidatos · ${r.vagas} vagas.`;
 }
+$('quantos').addEventListener('change', () => ultimo && desenhar(ultimo));
 
 async function atualizar() {
   const meu = ++pedido;

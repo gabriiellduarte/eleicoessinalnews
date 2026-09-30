@@ -102,6 +102,26 @@ function atualizarLocais({ itens, naoEncontrados }, uf, cidade) {
     .join('');
 }
 
+// --- placar de estados liderados (cena do mapa) -----------------------------
+function atualizarLideres(mapa, nacional, cor) {
+  const estados = {};
+  let semVotos = 0;
+  for (const u of UFS) {
+    const lider = mapa[u.sigla]?.candidatos[0];
+    if (lider?.votos > 0) estados[lider.numero] = (estados[lider.numero] || 0) + 1;
+    else semVotos++;
+  }
+  const blocos = Object.entries(estados)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([numero, total]) => {
+      const c = nacional.candidatos.find((x) => String(x.numero) === numero);
+      return `<div class="lider" style="--cor:${cor(numero)}"><b>${total}</b><span>${esc(c?.nome || numero)}<small>${total === 1 ? 'estado' : 'estados'}</small></span></div>`;
+    });
+  if (semVotos) blocos.push(`<div class="lider sem"><b>${semVotos}</b><span>Aguardando<small>sem votos apurados</small></span></div>`);
+  $('t-lideres').innerHTML = blocos.join('');
+}
+
 // --- cenas -------------------------------------------------------------------
 function montarCena() {
   const cena = cenaAtual();
@@ -139,15 +159,11 @@ async function atualizar() {
         listas.demais(r.candidatos.slice(2, 6), cor);
       } else if (cena.tipo === 'mapa') {
         atualizarMapa(mapa, { modo: 'lider', cor });
-        listas.legenda(r.candidatos.slice(0, 6), cor);
+        listas.legenda(r.candidatos.slice(0, 4), cor);
+        atualizarLideres(mapa, r, cor);
       } else {
-        // "Só os escolhidos": mostra apenas os candidatos em destaque deste cargo, com a posição real.
-        const numeros = estado.deputados === 'escolhidos' ? lerNumeros(estado.destaques[cena.cargo]) : [];
-        const escolhidos = r.candidatos.filter((c) => numeros.includes(String(c.numero)));
-        const topo = (escolhidos.length ? escolhidos : r.candidatos).slice(0, NO_RANKING);
-        const rotulo = escolhidos.length ? `${escolhidos.length} candidato(s) escolhido(s)` : `${NO_RANKING} mais votados`;
-        $('ranking-titulo').textContent = `${rotulo} · ${r.vagas} vagas · ${fmt.int(r.candidatos.length)} candidatos`;
-        listas.ranking(topo, cor, { teto: topo[0]?.pct });
+        ranking = { r, cargo: cena.cargo, cor };
+        desenharRanking();
       }
     }
     $('t-erro').hidden = true;
@@ -164,10 +180,46 @@ async function atualizar() {
   }
 }
 
+// --- lista de deputados, em páginas de 10 ---------------------------------------
+// Quantos entram na lista conforme a opção do painel ("vagas" = todos dentro do número de vagas).
+const LIMITE_DEPUTADOS = { top: 10, top20: 20, top30: 30, top50: 50 };
+const MS_MINIMO_POR_PAGINA = 5000;
+let ranking = null; // último resultado recebido para a cena de deputados
+let paginasDaCena = 1;
+let cenaDesde = Date.now();
+
+const msPorPagina = () => (estado.rodizio ? Math.max(MS_MINIMO_POR_PAGINA, (estado.tempo * 1000) / paginasDaCena) : 7000);
+
+function desenharRanking() {
+  if (!ranking || cenaAtual().tipo !== 'proporcional' || cenaAtual().cargo !== ranking.cargo) return;
+  const { r, cargo, cor } = ranking;
+  // "Só os escolhidos": apenas os candidatos em destaque deste cargo, com a posição real.
+  const numeros = estado.deputados === 'escolhidos' ? lerNumeros(estado.destaques[cargo]) : [];
+  const escolhidos = r.candidatos.filter((c) => numeros.includes(String(c.numero)));
+  const limite = estado.deputados === 'vagas' ? r.vagas : LIMITE_DEPUTADOS[estado.deputados] || NO_RANKING;
+  const lista = escolhidos.length ? escolhidos : r.candidatos.slice(0, limite);
+  const paginas = Math.max(1, Math.ceil(lista.length / NO_RANKING));
+  if (paginas !== paginasDaCena) {
+    // A cena fica no ar o bastante para todas as páginas passarem.
+    paginasDaCena = paginas;
+    agendarRodizio();
+  }
+  const pagina = Math.floor((Date.now() - cenaDesde) / msPorPagina()) % paginas;
+  const rotulo = escolhidos.length ? `${escolhidos.length} candidato(s) escolhido(s)` : `${lista.length} mais votados`;
+  const paginacao = paginas > 1 ? ` · página ${pagina + 1} de ${paginas}` : '';
+  $('ranking-titulo').textContent = `${rotulo} · ${r.vagas} vagas · ${fmt.int(r.candidatos.length)} candidatos${paginacao}`;
+  listas.ranking(lista.slice(pagina * NO_RANKING, (pagina + 1) * NO_RANKING), cor, { teto: lista[0]?.pct });
+}
+// Troca de página mesmo quando os dados só chegam de 30 em 30 segundos (fonte TSE).
+setInterval(desenharRanking, 1000);
+
 let temporizador;
 function agendarRodizio() {
   clearTimeout(temporizador);
-  if (estado.rodizio) temporizador = setTimeout(() => mostrar(vizinha(1)), estado.tempo * 1000);
+  if (!estado.rodizio) return;
+  const duracao = Math.max(estado.tempo * 1000, paginasDaCena * msPorPagina());
+  const restante = Math.max(1000, duracao - (Date.now() - cenaDesde));
+  temporizador = setTimeout(() => mostrar(vizinha(1)), restante);
 }
 
 // Próxima (ou anterior) cena. No rodízio automático só entram as marcadas no painel.
@@ -182,6 +234,9 @@ function vizinha(passo, soAtivas = true) {
 
 function mostrar(id) {
   cenaNoAr = id;
+  cenaDesde = Date.now();
+  paginasDaCena = 1;
+  ranking = null;
   if (estado.cena !== id) definir({ cena: id });
   const palco = $('cena');
   palco.classList.add('saindo');
@@ -199,7 +254,10 @@ aoMudar((e, alteracao) => {
     montarCena();
     atualizar();
   }
-  if (['rodizio', 'tempo', 'cenasAtivas'].some((k) => k in alteracao)) agendarRodizio();
+  if (['rodizio', 'tempo', 'cenasAtivas'].some((k) => k in alteracao)) {
+    if ('rodizio' in alteracao) cenaDesde = Date.now(); // ao retomar, a cena ganha o tempo inteiro de novo
+    agendarRodizio();
+  }
 });
 
 // --- faixa inferior com os estados --------------------------------------------

@@ -1,6 +1,7 @@
 // Componentes de tela compartilhados entre a página pública e o telão.
 import { CONFIG } from './config.js';
 import { UFS } from './ufs.js';
+import { MAPA } from './mapa-brasil.js';
 
 const inteiro = new Intl.NumberFormat('pt-BR');
 export const fmt = {
@@ -132,36 +133,57 @@ export function criarLista(ul) {
   };
 }
 
-// Mapa do Brasil em blocos (um bloco por UF).
+// Mapa do Brasil com o contorno real dos estados (malha do IBGE, em mapa-brasil.js).
+// Estados pequenos demais para caber o texto têm a sigla ao lado, ligada por um traço.
+const ROTULO_FORA = { RN: [1040, 268], PB: [1046, 318], PE: [1050, 362], AL: [1044, 406], SE: [1030, 450], ES: [935, 668], RJ: [858, 772], DF: [712, 528] };
+const MARGEM_DIREITA = 110;
+
 export function criarMapa(el, aoClicar) {
   el.classList.add('mapa');
-  const blocos = {};
-  for (const u of UFS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'uf';
-    b.style.gridColumn = u.col + 1;
-    b.style.gridRow = u.lin + 1;
-    b.innerHTML = `<b>${u.sigla}</b><small></small>`;
-    b.title = u.nome;
-    if (aoClicar) b.addEventListener('click', () => aoClicar(u.sigla));
-    else b.tabIndex = -1;
-    el.appendChild(b);
-    blocos[u.sigla] = b;
+  const estados = UFS.map((u) => ({ ...u, ...MAPA.estados[u.sigla], fora: ROTULO_FORA[u.sigla] }));
+  el.innerHTML = `
+    <svg class="mapa-svg${aoClicar ? ' clicavel' : ''}" viewBox="0 0 ${MAPA.largura + MARGEM_DIREITA} ${MAPA.altura}" role="group" aria-label="Mapa do Brasil por estado">
+      <g class="mapa-estados">
+        ${estados.map((u) => `<path class="uf vazio" data-uf="${u.sigla}" d="${u.d}"${aoClicar ? ' tabindex="0" role="button"' : ''}><title>${u.nome}</title></path>`).join('')}
+      </g>
+      <g class="mapa-rotulos">
+        ${estados.map((u) => {
+          const [x, y] = u.fora || u.centro;
+          const traco = u.fora ? `<line x1="${u.centro[0]}" y1="${u.centro[1]}" x2="${x - (u.sigla === 'DF' ? -2 : 6)}" y2="${y - 6}"/>` : '';
+          // Fora do estado: "RN 45%" numa linha, alinhado à esquerda. Dentro: sigla em cima, percentual embaixo.
+          const texto = u.fora
+            ? `<text x="${x}" y="${y}" class="fora"><tspan class="sigla">${u.sigla}</tspan> <tspan class="pct"></tspan></text>`
+            : `<text x="${x}" y="${y}"><tspan class="sigla" x="${x}">${u.sigla}</tspan><tspan class="pct" x="${x}" dy="1.15em"></tspan></text>`;
+          return `<g data-rotulo="${u.sigla}">${traco}${texto}</g>`;
+        }).join('')}
+      </g>
+    </svg>`;
+  const caminho = Object.fromEntries([...el.querySelectorAll('path[data-uf]')].map((p) => [p.dataset.uf, p]));
+  const rotulo = Object.fromEntries([...el.querySelectorAll('[data-rotulo]')].map((g) => [g.dataset.rotulo, g]));
+  if (aoClicar) {
+    const escolher = (e) => {
+      const uf = e.target.closest?.('[data-uf]')?.dataset.uf;
+      if (uf && (e.type === 'click' || e.key === 'Enter' || e.key === ' ')) aoClicar(uf);
+    };
+    el.addEventListener('click', escolher);
+    el.addEventListener('keydown', escolher);
   }
   // modo 'lider': cor de quem lidera no estado; 'progresso': intensidade = % apurado.
   return function atualizar(mapa, { modo = 'lider', cor, selecionada } = {}) {
     for (const u of UFS) {
-      const b = blocos[u.sigla];
+      const p = caminho[u.sigla];
       const r = mapa?.[u.sigla];
       const lider = r?.candidatos[0];
-      const temVoto = r && r.pctSecoes > 0 && lider?.votos > 0;
-      b.classList.toggle('vazio', !temVoto);
-      b.classList.toggle('sel', u.sigla === selecionada);
-      b.style.setProperty('--cor', temVoto ? (modo === 'lider' ? cor(lider.numero) : '#D90404') : '');
-      b.style.setProperty('--forca', temVoto ? (0.35 + 0.65 * (r.pctSecoes / 100)).toFixed(2) : '');
-      b.querySelector('small').textContent = r ? fmt.pct(r.pctSecoes, 0) : '–';
-      b.title = temVoto ? `${u.nome}: ${lider.nome} ${fmt.pct(lider.pct)} · ${fmt.pct(r.pctSecoes)} das seções` : u.nome;
+      const temVoto = !!r && r.pctSecoes > 0 && lider?.votos > 0;
+      p.classList.toggle('vazio', !temVoto);
+      p.classList.toggle('sel', u.sigla === selecionada);
+      // O estado escolhido vai para o fim do grupo, para o contorno ficar por cima dos vizinhos.
+      if (u.sigla === selecionada && p.nextSibling) p.parentNode.appendChild(p);
+      p.style.setProperty('--cor', temVoto ? (modo === 'lider' ? cor(lider.numero) : '#D90404') : '');
+      p.style.setProperty('--forca', temVoto ? (0.35 + 0.65 * (r.pctSecoes / 100)).toFixed(2) : '');
+      p.querySelector('title').textContent = temVoto ? `${u.nome}: ${lider.nome} ${fmt.pct(lider.pct)} · ${fmt.pct(r.pctSecoes)} das seções` : u.nome;
+      rotulo[u.sigla].classList.toggle('sobre-cor', temVoto);
+      rotulo[u.sigla].querySelector('.pct').textContent = r ? fmt.pct(r.pctSecoes, 0) : '';
     }
   };
 }

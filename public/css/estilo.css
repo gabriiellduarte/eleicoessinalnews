@@ -286,3 +286,49 @@ body.mouse .t-engrenagem { opacity: 1; pointer-events: auto; }
 .p-lista small { opacity: .75; white-space: nowrap; }
 .p-status { font-size: .8em; color: var(--suave); margin-top: .4em; }
 .telao-corpo .ranking .cand-pos { width: 4.2rem; text-align: right; }
+
+/* ---------- mapa real dos estados (SVG) ---------- */
+.mapa { display: block; }
+.mapa-svg { display: block; width: 100%; height: auto; max-height: 100%; overflow: visible; }
+.mapa-svg .uf { fill: color-mix(in srgb, var(--cor, #9e9e9e) calc(var(--forca, 1) * 100%), var(--painel)); stroke: var(--painel); stroke-width: 2; stroke-linejoin: round; transition: fill .6s; outline: none; }
+.mapa-svg .uf.vazio { fill: var(--trilho); }
+.mapa-svg.clicavel .uf { cursor: pointer; }
+.mapa-svg.clicavel .uf:hover, .mapa-svg .uf:focus-visible { stroke: var(--texto); stroke-width: 3; }
+.mapa-svg .uf.sel { stroke: var(--texto); stroke-width: 5; }
+.mapa-rotulos { pointer-events: none; font-family: var(--fonte); }
+.mapa-rotulos text { text-anchor: middle; font-size: 22px; fill: var(--suave); font-variant-numeric: tabular-nums; }
+.mapa-rotulos .sigla { font-weight: 900; font-size: 24px; fill: var(--texto); }
+.mapa-rotulos .sobre-cor text:not(.fora), .mapa-rotulos .sobre-cor text:not(.fora) .sigla { fill: #fff; }
+.mapa-rotulos text.fora { text-anchor: start; }
+.mapa-rotulos line { stroke: var(--suave); stroke-width: 1.5; }
+.telao-corpo #t-mapa { height: 100%; display: grid; place-items: center; }
+.telao-corpo #t-mapa .mapa-svg { height: 100%; width: auto; max-width: 100%; }
+.painel .mapa-rotulos .pct { display: none; }
+.painel .mapa-rotulos .sigla { font-size: 34px; }
+.painel .mapa-svg .uf.sel { fill: var(--vermelho); }
+.painel .mapa-svg .uf.sel ~ * { }
+#cena-mapa { align-items: stretch; }
+#cena-mapa .t-painel { align-self: center; }
+.telao-corpo #t-mapa { display: block; height: 100%; min-height: 0; }
+.telao-corpo #t-mapa .mapa-svg { width: 100%; height: 100%; }
+.mapa-rotulos text { font-size: 25px; }
+.mapa-rotulos .sigla { font-size: 29px; }
+.mapa-svg .uf { stroke-width: 2.5; }
+
+/* ---------- telão: cena do mapa em estilo de apresentação ---------- */
+#cena-mapa { grid-template-columns: 47rem 1fr; gap: 2.5rem; margin: -1rem 0 -1.2rem; height: calc(100% + 2.2rem); }
+#cena-mapa .t-lado { justify-content: center; }
+#cena-mapa .t-painel { align-self: stretch; }
+.telao-corpo #t-mapa { background: radial-gradient(closest-side, rgba(255, 255, 255, .07), transparent 75%); }
+.telao-corpo #t-mapa .mapa-svg { filter: drop-shadow(0 1.2rem 1.6rem rgba(0, 0, 0, .65)); }
+.telao-corpo #t-mapa .uf { fill: color-mix(in srgb, var(--cor, #9e9e9e) calc(45% + var(--forca, 1) * 55%), #1c1c21); stroke: #0b0b0d; stroke-width: 3; }
+.telao-corpo #t-mapa .uf.vazio { fill: #34343c; }
+.telao-corpo #t-mapa .mapa-rotulos text { font-size: 26px; fill: #d5d7db; paint-order: stroke; stroke: rgba(0, 0, 0, .6); stroke-width: 5px; stroke-linejoin: round; }
+.telao-corpo #t-mapa .mapa-rotulos .sigla { font-size: 34px; fill: #fff; }
+.telao-corpo #t-mapa .mapa-rotulos line { stroke: rgba(255, 255, 255, .55); stroke-width: 2; }
+.lideres { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.5rem; }
+.lider { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.lider b { flex: none; min-width: 4.4rem; text-align: center; font-size: 3rem; font-weight: 900; line-height: 1; padding: .5rem .4rem; border-radius: .6rem; background: var(--cor); color: #fff; font-variant-numeric: tabular-nums; }
+.lider span { font-size: 1.45rem; font-weight: 700; line-height: 1.15; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lider small { display: block; font-size: 1rem; font-weight: 400; color: var(--suave); text-transform: uppercase; letter-spacing: .08em; }
+.lider.sem b { background: #34343c; color: var(--suave); }

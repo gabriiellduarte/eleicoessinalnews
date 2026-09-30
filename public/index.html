@@ -36,6 +36,14 @@
         <div class="filtros">
           <select id="uf" aria-label="Estado"></select>
           <select id="cidade" aria-label="Cidade"></select>
+          <select id="quantos" aria-label="Quantos candidatos mostrar" hidden>
+            <option value="10">10 mais votados</option>
+            <option value="30" selected>30 mais votados</option>
+            <option value="50">50 mais votados</option>
+            <option value="100">100 mais votados</option>
+            <option value="vagas">Dentro das vagas</option>
+            <option value="todos">Todos os candidatos</option>
+          </select>
         </div>
       </div>
       <input type="search" id="busca" class="busca" placeholder="Buscar candidato por nome ou número" aria-label="Buscar candidato">

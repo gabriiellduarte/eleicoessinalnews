@@ -48,8 +48,16 @@ function estatico(urlPath, res) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
-    if (url.pathname.startsWith('/api/tse/')) return tseProxy.atender(url.pathname.slice('/api/tse/'.length), res);
-    if (url.pathname.startsWith('/api/cadastro/')) return cadastro.atender(url.pathname.slice('/api/cadastro/'.length), res);
+    // Aceita /api/<nome>/<caminho> e também /api/<nome>?caminho=<caminho>: na Vercel as
+    // regras do vercel.json reescrevem o endereço para a segunda forma antes de chegar aqui.
+    const caminhoDe = (nome) => {
+      if (url.pathname.startsWith(`/api/${nome}/`)) return url.pathname.slice(`/api/${nome}/`.length);
+      return url.pathname === `/api/${nome}` ? url.searchParams.get('caminho') || '' : null;
+    };
+    const doTse = caminhoDe('tse');
+    if (doTse !== null) return tseProxy.atender(doTse, res);
+    const doCadastro = caminhoDe('cadastro');
+    if (doCadastro !== null) return cadastro.atender(doCadastro, res);
     estatico(url.pathname, res);
   })
   .on('error', (e) => {

@@ -92,7 +92,8 @@ function normalizar(d, cargo, uf, cidade) {
         numero: String(c.n),
         nome: c.nmu || c.nm || '',
         partido: c._partido,
-        vice: c.nv || c.vs?.[0]?.nmu || c.vs?.[0]?.nm || '',
+        // `vs` traz vice (tp "v") ou suplentes de senador; só o vice vai para a tela.
+        vice: c.nv || (c.vs || []).find((x) => x.tp === 'v')?.nmu || '',
         votos: num(c.vap),
         pct: num(c.pvap),
         situacao,
@@ -100,16 +101,20 @@ function normalizar(d, cargo, uf, cidade) {
         foto: c.sqcand ? `${raiz}/fotos/${uf.toLowerCase()}/${c.sqcand}.jpeg` : '',
       };
     })
-    .sort((a, b) => b.votos - a.votos);
+    // Empate (inclusive todos zerados antes da apuração): ordem alfabética.
+    .sort((a, b) => b.votos - a.votos || a.nome.localeCompare(b.nome, 'pt-BR'));
   candidatos.forEach((c, i) => (c.pos = i + 1));
   const pctSecoes = num(s.pst);
+  const vagasNoArquivo = num((Array.isArray(d.carg) ? d.carg[0] : d.carg)?.nv);
   return {
     fonte: 'tse',
+    // O TSE publica os arquivos zerados antes do início da totalização.
+    aguardando: num(s.st) === 0,
     cargo,
     uf,
     cidade: cidade || '',
     local: nomeLocal(uf, cidade),
-    vagas: vagasDe(cargo, uf),
+    vagas: vagasNoArquivo || vagasDe(cargo, uf),
     pctSecoes,
     secoes: num(s.ts ?? d.s),
     secoesTotalizadas: num(s.st),

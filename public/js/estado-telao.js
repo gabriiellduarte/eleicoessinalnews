@@ -24,7 +24,8 @@ const PADRAO = {
   // De onde vêm os votos: 'br' = Brasil todo (Presidente soma o país; os outros cargos, o estado)
   // | 'uf' = só o estado escolhido, inclusive Presidente | 'cidade' = só a cidade
   abrangencia: 'br',
-  // Cenas de deputados: 'top' = 10 mais votados | 'escolhidos' = só os candidatos em destaque
+  // Cenas de deputados: 'top' = 10 mais votados | 'top20' | 'top30' | 'top50' | 'vagas' = todas as
+  // cadeiras do estado | 'escolhidos' = só os candidatos em destaque
   deputados: 'top',
   cidade: CONFIG.destaques.cidade,
   destaques: {

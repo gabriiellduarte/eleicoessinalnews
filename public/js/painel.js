@@ -56,8 +56,13 @@ export function montarPainel(el, fonte) {
       <p class="p-atual">Nas cenas Dep. Federal e Dep. Estadual, mostrar:</p>
       <div class="p-linha p-abr">
         <button type="button" data-dep="top">10 mais votados</button>
+        <button type="button" data-dep="top20">20</button>
+        <button type="button" data-dep="top30">30</button>
+        <button type="button" data-dep="top50">50</button>
+        <button type="button" data-dep="vagas">Todas as vagas</button>
         <button type="button" data-dep="escolhidos">Só os escolhidos</button>
       </div>
+      <p class="p-dica">Acima de 10 nomes a lista passa em páginas de 10, e a cena fica no ar até todas passarem. "Todas as vagas" mostra os mais votados até o número de cadeiras do estado.</p>
       <p class="p-atual">Escolhidos:</p>
       <ul class="p-escolhidos"></ul>
       <p class="p-atual">Lista oficial do TSE — clique para incluir ou tirar:</p>
