@@ -154,7 +154,7 @@ http
     };
     if (url.pathname === '/api/controle' || url.pathname.startsWith('/api/controle/')) return atenderControle(req, res, url);
     const doTse = caminhoDe('tse');
-    if (doTse !== null) return tseProxy.atender(doTse, res);
+    if (doTse !== null) return tseProxy.atender(doTse, res, req);
     const doCadastro = caminhoDe('cadastro');
     if (doCadastro !== null) return cadastro.atender(doCadastro, res);
     estatico(url.pathname, res);

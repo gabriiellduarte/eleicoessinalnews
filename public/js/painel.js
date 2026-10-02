@@ -153,9 +153,10 @@ export function montarPainel(el, fonte) {
   }
 
   async function trocarUf(uf) {
-    if (uf === estado.uf) return;
-    // A cidade anterior não pertence ao novo estado: volta para o estado inteiro.
-    definir({ uf, cidade: UF_POR_SIGLA[uf].capital, abrangencia: estado.abrangencia === 'cidade' ? 'uf' : estado.abrangencia });
+    // Escolher um estado já põe no ar só os votos dele, sem precisar clicar em "Só o estado".
+    // A cidade anterior não pertence ao novo estado: passa a ser a capital.
+    if (uf === estado.uf && estado.abrangencia === 'uf') return;
+    definir({ uf, abrangencia: 'uf', ...(uf !== estado.uf && { cidade: UF_POR_SIGLA[uf].capital }) });
   }
 
   // --- candidatos -------------------------------------------------------------
@@ -254,7 +255,7 @@ export function montarPainel(el, fonte) {
     const d = b.dataset;
     if (d.remover) alternarDestaque(...d.remover.split('|'));
     else if (d.cand) alternarDestaque(filtro.cargo, d.cand);
-    else if (d.cidade) definir({ cidade: d.cidade });
+    else if (d.cidade) definir({ cidade: d.cidade, abrangencia: 'cidade' }); // já vai ao ar "Só a cidade"
     else if (d.cena) definir({ cena: d.cena });
     else if (d.abr) definir({ abrangencia: d.abr });
     else if (d.dep) definir({ deputados: d.dep });
