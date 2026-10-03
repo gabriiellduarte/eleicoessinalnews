@@ -182,27 +182,76 @@ export function criarMapa(el, aoClicar) {
         }).join('')}
       </g>
     </svg>`;
+  const svg = el.querySelector('svg');
   const caminho = Object.fromEntries([...el.querySelectorAll('path[data-uf]')].map((p) => [p.dataset.uf, p]));
   const rotulo = Object.fromEntries([...el.querySelectorAll('[data-rotulo]')].map((g) => [g.dataset.rotulo, g]));
   if (aoClicar) {
     const escolher = (e) => {
       const uf = e.target.closest?.('[data-uf]')?.dataset.uf;
-      if (uf && (e.type === 'click' || e.key === 'Enter' || e.key === ' ')) aoClicar(uf);
+      if (uf && (e.type === 'click' || e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        aoClicar(uf, e);
+      }
     };
     el.addEventListener('click', escolher);
     el.addEventListener('keydown', escolher);
   }
   // modo 'lider': cor de quem lidera no estado; 'progresso': intensidade = % apurado.
-  return function atualizar(mapa, { modo = 'lider', cor, selecionada } = {}) {
+  // `selecionada`: sigla de um estado ou lista de siglas (os estados de uma região).
+  // `foco`: lista de siglas (uma região): o mapa aproxima nelas e apaga os outros estados.
+  const inteiro = [0, 0, MAPA.largura + MARGEM_DIREITA, MAPA.altura];
+  let vistaAtual = inteiro;
+  let focoAtual = '';
+  let animacao;
+  function enquadrar(foco) {
+    const chave = foco.join(',');
+    if (chave === focoAtual) return;
+    focoAtual = chave;
+    let alvo = inteiro;
+    if (foco.length) {
+      // Caixa que contém os estados e as siglas deles (inclusive as que ficam do lado de fora).
+      const caixas = foco.flatMap((uf) => [caminho[uf].getBBox(), rotulo[uf].getBBox()]);
+      const x0 = Math.min(...caixas.map((b) => b.x));
+      const y0 = Math.min(...caixas.map((b) => b.y));
+      const x1 = Math.max(...caixas.map((b) => b.x + b.width));
+      const y1 = Math.max(...caixas.map((b) => b.y + b.height));
+      // Mapa ainda escondido (ex.: gaveta do telão fechada): não dá para medir; tenta na próxima.
+      if (x1 - x0 <= 0) return (focoAtual = '');
+      const folga = 0.06 * Math.max(x1 - x0, y1 - y0);
+      alvo = [x0 - folga, y0 - folga, x1 - x0 + 2 * folga, y1 - y0 + 2 * folga];
+    }
+    // Aproximação suave (o viewBox não anima por CSS).
+    cancelAnimationFrame(animacao);
+    const de = vistaAtual;
+    const inicio = performance.now();
+    const passo = (t) => {
+      const k = COM_ANIMACAO ? Math.min(1, (t - inicio) / 600) : 1;
+      const s = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      vistaAtual = de.map((v, i) => v + (alvo[i] - v) * s);
+      svg.setAttribute('viewBox', vistaAtual.map((v) => v.toFixed(1)).join(' '));
+      if (k < 1) animacao = requestAnimationFrame(passo);
+    };
+    animacao = requestAnimationFrame(passo);
+  }
+
+  return function atualizar(mapa, { modo = 'lider', cor, selecionada, foco = [] } = {}) {
+    const escolhidas = new Set([].concat(selecionada ?? []));
+    const naRegiao = new Set(foco);
+    for (const u of UFS) {
+      const apagado = naRegiao.size > 0 && !naRegiao.has(u.sigla);
+      caminho[u.sigla].classList.toggle('apagado', apagado);
+      rotulo[u.sigla].classList.toggle('apagado', apagado);
+    }
+    enquadrar(foco);
     for (const u of UFS) {
       const p = caminho[u.sigla];
       const r = mapa?.[u.sigla];
       const lider = r?.candidatos[0];
       const temVoto = !!r && r.pctSecoes > 0 && lider?.votos > 0;
       p.classList.toggle('vazio', !temVoto);
-      p.classList.toggle('sel', u.sigla === selecionada);
+      p.classList.toggle('sel', escolhidas.has(u.sigla));
       // O estado escolhido vai para o fim do grupo, para o contorno ficar por cima dos vizinhos.
-      if (u.sigla === selecionada && p.nextSibling) p.parentNode.appendChild(p);
+      if (escolhidas.has(u.sigla) && p.nextSibling) p.parentNode.appendChild(p);
       p.style.setProperty('--cor', temVoto ? (modo === 'lider' ? cor(lider.numero) : '#D90404') : '');
       p.style.setProperty('--forca', temVoto ? (0.35 + 0.65 * (r.pctSecoes / 100)).toFixed(2) : '');
       p.querySelector('title').textContent = temVoto ? `${u.nome}: ${lider.nome} ${fmt.pct(lider.pct)} · ${fmt.pct(r.pctSecoes)} das seções` : u.nome;
@@ -210,6 +259,45 @@ export function criarMapa(el, aoClicar) {
       rotulo[u.sigla].querySelector('.pct').textContent = r ? fmt.pct(r.pctSecoes, 0) : '';
     }
   };
+}
+
+// Menu que abre sobre o mapa, no ponto clicado (ex.: ver o estado ou a região dele).
+// `area` precisa ter position: relative e conter o mapa. abrir(e, titulo, [{ rotulo, valor }]).
+export function criarMenuMapa(area, aoEscolher) {
+  const menu = document.createElement('div');
+  menu.className = 'mapa-menu';
+  menu.setAttribute('role', 'menu');
+  menu.hidden = true;
+  area.appendChild(menu);
+  const fechar = () => (menu.hidden = true);
+  menu.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    fechar();
+    aoEscolher(b.dataset.valor);
+  });
+  // Clique fora fecha; o clique num estado não, porque é ele que abre o menu.
+  document.addEventListener('click', (e) => {
+    if (!menu.hidden && !menu.contains(e.target) && !(area.contains(e.target) && e.target.closest?.('[data-uf]'))) fechar();
+  });
+  const comEsc = (e) => e.key === 'Escape' && fechar();
+  area.addEventListener('keydown', comEsc);
+  document.addEventListener('keydown', comEsc);
+
+  function abrir(e, titulo, itens) {
+    menu.innerHTML = `<strong>${esc(titulo)}</strong>` + itens.map((i) => `<button type="button" role="menuitem" data-valor="${esc(i.valor)}">${esc(i.rotulo)}</button>`).join('');
+    const caixa = area.getBoundingClientRect();
+    const r = e.target.getBoundingClientRect();
+    const alvo = e.type === 'click' && e.clientX ? { x: e.clientX, y: e.clientY } : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    menu.hidden = false;
+    // Centralizado no ponto clicado, sem sair da área do mapa.
+    const x = Math.min(Math.max(alvo.x - caixa.left - menu.offsetWidth / 2, 0), Math.max(0, caixa.width - menu.offsetWidth));
+    const y = Math.min(alvo.y - caixa.top + 8, caixa.height - menu.offsetHeight);
+    menu.style.left = `${x}px`;
+    menu.style.top = `${Math.max(y, 0)}px`;
+    menu.querySelector('button').focus();
+  }
+  return { abrir, fechar };
 }
 
 // Preenche elementos marcados com data-s="campo" a partir de um resultado.

@@ -3,11 +3,11 @@
 // URL: ?uf=CE · ?cidade=Aracati (só os votos da cidade) · ?tempo=15
 //      ?cena=presidente|mapa|governador|senador|depfederal|depestadual|destaques|cidade (fixa a cena)
 import { CONFIG } from './config.js';
-import { UFS, CARGOS, nomeLocal, tituloCargo } from './ufs.js';
+import { UFS, CARGOS, REGIOES, nomeLocal, tituloCargo } from './ufs.js';
 import { fonte } from './fontes/index.js';
 import { CENAS, estado, definir, aoMudar, pedirAoEntrar, tituloDestaques } from './estado-telao.js';
 import { carregarDestaques, rotuloCargo, textoPosicao } from './destaques.js';
-import { tipoDaCena, escopoDaCena, listaDaCena, DESENHO_ROLAGEM } from './lista-telao.js';
+import { tipoDaCena, escopoDaCena, listaDaCena, resultadoNoEscopo, DESENHO_ROLAGEM } from './lista-telao.js';
 import { montarPainel } from './painel.js';
 import { montarLogo, coresPara, corDaPaleta, corDoPartido, criarLista, criarMapa, preencherStats, avatarHtml, classeSituacao, esc, fmt, resumoDefinicao } from './ui.js';
 
@@ -194,9 +194,9 @@ let cenaMontada = '';
 function montarCena() {
   const cena = cenaAtual();
   cenaMontada = montagemDaCena();
-  const { uf, cidade } = escopoDaCena(cena);
+  const { uf, cidade, regiao } = escopoDaCena(cena);
   let titulo = tituloCargo(cena.cargo, uf);
-  let complemento = nomeLocal(uf, cidade);
+  let complemento = regiao ? `Região ${REGIOES[regiao]}` : nomeLocal(uf, cidade);
   if (cena.tipo === 'mapa') titulo = 'Mapa da apuração';
   if (cena.tipo === 'destaques') [titulo, complemento] = [tituloDestaques(), uf];
   $('t-titulo').innerHTML = `${esc(titulo)} <span>· ${esc(complemento)}</span>`;
@@ -215,7 +215,8 @@ function montarCena() {
 async function atualizar() {
   const meu = ++pedido;
   const cena = cenaAtual();
-  const { uf, cidade } = escopoDaCena(cena);
+  const escopo = escopoDaCena(cena);
+  const { uf, cidade } = escopo;
   try {
     let r;
     if (cena.tipo === 'destaques') {
@@ -224,7 +225,7 @@ async function atualizar() {
       atualizarLocais(d, uf, cidade);
       r = d.referencia;
     } else {
-      const [res, mapa] = await Promise.all([fonte.resultado(cena.cargo, uf, cidade), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null]);
+      const [res, mapa] = await Promise.all([resultadoNoEscopo(fonte, cena.cargo, escopo), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null]);
       if (meu !== pedido) return;
       r = res;
       const cor = coresPara(`${cena.cargo}|${uf}`, r.candidatos);
@@ -346,11 +347,12 @@ function preCarregar(id) {
   const base = CENAS.find((c) => c.id === id);
   if (!base) return;
   const cena = { ...base, tipo: tipoDaCena(base) };
-  const { uf, cidade } = escopoDaCena(cena);
+  const escopo = escopoDaCena(cena);
+  const { uf, cidade } = escopo;
   const pedidos =
     cena.tipo === 'destaques'
       ? [carregarDestaques(fonte, { uf, cidade, numeros: estado.destaques })]
-      : [fonte.resultado(cena.cargo, uf, cidade), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null];
+      : [resultadoNoEscopo(fonte, cena.cargo, escopo), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null];
   Promise.allSettled(pedidos);
 }
 
@@ -392,7 +394,7 @@ aoMudar((e, alteracao) => {
   if (alteracao.cena && alteracao.cena !== cenaNoAr && CENAS.some((c) => c.id === alteracao.cena)) return mostrar(alteracao.cena);
   // O estado completo chega de novo com frequência (outro aparelho abrindo o controle,
   // consulta periódica na Vercel): só remonta a cena se algo dela mudou de verdade.
-  if (['uf', 'cidade', 'abrangencia', 'destaques', 'deputados', 'formato'].some((k) => k in alteracao) && montagemDaCena() !== cenaMontada) {
+  if (['uf', 'cidade', 'abrangencia', 'regiao', 'destaques', 'deputados', 'formato'].some((k) => k in alteracao) && montagemDaCena() !== cenaMontada) {
     montarCena();
     atualizar();
   } else if ('lista' in alteracao) {

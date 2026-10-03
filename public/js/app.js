@@ -1,15 +1,15 @@
 // Página pública da apuração.
 import { CONFIG } from './config.js';
-import { UFS, UF_POR_SIGLA, CARGOS, nomeLocal, tituloCargo, semAcento } from './ufs.js';
+import { UFS, UF_POR_SIGLA, CARGOS, REGIOES, ufsDaRegiao, nomeLocal, tituloCargo, semAcento } from './ufs.js';
 import { fonte } from './fontes/index.js';
 import { carregarDestaques, rotuloCargo, textoPosicao } from './destaques.js';
-import { montarLogo, coresPara, criarLista, criarMapa, preencherStats, classeSituacao, esc, fmt, resumoDefinicao } from './ui.js';
+import { montarLogo, coresPara, criarLista, criarMapa, criarMenuMapa, preencherStats, classeSituacao, esc, fmt, resumoDefinicao } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 const LIMITE_LISTA = 30;
-const estado = { cargo: 'presidente', uf: 'BR', cidade: '', busca: '' };
+const estado = { cargo: 'presidente', uf: 'BR', cidade: '', regiao: '', busca: '' };
 let atualizarLista = criarLista($('lista'));
-const atualizarMapa = criarMapa($('mapa'), (uf) => selecionar(estado.cargo, uf));
+const atualizarMapa = criarMapa($('mapa'), (uf, e) => (CARGOS[estado.cargo].nacional ? abrirMenuMapa(uf, e) : selecionar(estado.cargo, uf)));
 let pedido = 0;
 let ultimo = null; // último resultado recebido, para a busca filtrar sem nova consulta
 
@@ -27,7 +27,26 @@ $('abas').addEventListener('click', (e) => {
   if (CARGOS[cargo].nacional && !estado.cidade) selecionar(cargo, 'BR');
   else selecionar(cargo, mantemLocal ? estado.uf : CONFIG.ufDestaque, mantemLocal ? estado.cidade : '');
 });
-$('uf').addEventListener('change', (e) => selecionar(estado.cargo, e.target.value));
+// Valores "R:NE" no seletor são regiões; o resto, siglas de estado.
+$('uf').addEventListener('change', (e) => {
+  const v = e.target.value;
+  if (v.startsWith('R:')) selecionar(estado.cargo, 'BR', '', v.slice(2));
+  else selecionar(estado.cargo, v);
+});
+
+// Presidente: clicar num estado do mapa pergunta se é para ver o estado ou a região dele.
+const menuMapa = criarMenuMapa($('mapa-area'), (valor) => {
+  if (valor.startsWith('R:')) selecionar(estado.cargo, 'BR', '', valor.slice(2));
+  else selecionar(estado.cargo, valor);
+});
+$('mapa-voltar').addEventListener('click', () => selecionar(estado.cargo, 'BR'));
+function abrirMenuMapa(uf, e) {
+  const u = UF_POR_SIGLA[uf];
+  menuMapa.abrir(e, u.nome, [
+    { rotulo: `Ver estado: ${u.nome}`, valor: uf },
+    { rotulo: `Ver Região ${REGIOES[u.regiao]}`, valor: `R:${u.regiao}` },
+  ]);
+}
 $('cidade').addEventListener('change', (e) => selecionar(estado.cargo, ufDasCidades(estado.uf), e.target.value));
 $('busca').addEventListener('input', (e) => {
   estado.busca = e.target.value;
@@ -58,19 +77,29 @@ async function preencherCidades(uf) {
   sel.value = estado.cidade;
 }
 
-function selecionar(cargo, uf, cidade = '') {
-  Object.assign(estado, { cargo, uf, cidade, busca: '' });
+function selecionar(cargo, uf, cidade = '', regiao = '') {
   const c = CARGOS[cargo];
+  if (!c.nacional) regiao = ''; // regiões só para Presidente
+  Object.assign(estado, { cargo, uf, cidade, regiao, busca: '' });
+  menuMapa.fechar();
   document.querySelectorAll('#abas button').forEach((b) => b.setAttribute('aria-selected', b.dataset.cargo === cargo));
   $('uf').innerHTML =
-    (c.nacional ? '<option value="BR">Brasil</option>' : '') +
-    [...UFS].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((u) => `<option value="${u.sigla}">${u.nome}</option>`).join('');
-  $('uf').value = uf;
+    (c.nacional
+      ? '<option value="BR">Brasil</option><optgroup label="Regiões">' +
+        Object.entries(REGIOES).map(([sigla, nome]) => `<option value="R:${sigla}">Região ${nome}</option>`).join('') +
+        '</optgroup><optgroup label="Estados">'
+      : '') +
+    [...UFS].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((u) => `<option value="${u.sigla}">${u.nome}</option>`).join('') +
+    (c.nacional ? '</optgroup>' : '');
+  $('uf').value = regiao ? `R:${regiao}` : uf;
   preencherCidades(uf);
   $('titulo').textContent = tituloCargo(cargo, uf);
-  $('local').textContent = nomeLocal(uf, cidade);
+  $('local').textContent = regiao ? `Região ${REGIOES[regiao]}` : nomeLocal(uf, cidade);
   $('busca').value = '';
   $('mapa-titulo').textContent = c.nacional ? 'Quem lidera em cada estado' : 'Andamento da apuração por estado';
+  $('mapa-dica').hidden = !c.nacional;
+  $('mapa-voltar').hidden = !regiao;
+  if (c.nacional) $('mapa-titulo').textContent = regiao ? `Região ${REGIOES[regiao]}: quem lidera em cada estado` : 'Quem lidera em cada estado';
   // Lista nova a cada troca: os candidatos são outros.
   $('lista').innerHTML = '';
   atualizarLista = criarLista($('lista'));
@@ -105,9 +134,9 @@ $('quantos').addEventListener('change', () => ultimo && desenhar(ultimo));
 
 async function atualizar() {
   const meu = ++pedido;
-  const { cargo, uf, cidade } = estado;
+  const { cargo, uf, cidade, regiao } = estado;
   try {
-    const r = await fonte.resultado(cargo, uf, cidade);
+    const r = regiao ? await fonte.regiao(cargo, regiao) : await fonte.resultado(cargo, uf, cidade);
     if (meu !== pedido) return;
     $('erro').hidden = !r.aguardando;
     $('erro').textContent = 'Aguardando o início da totalização pelo TSE. Os candidatos abaixo são os registrados oficialmente, em ordem alfabética.';
@@ -121,6 +150,9 @@ async function atualizar() {
   }
 }
 
+// Região escolhida: o mapa mostra só os estados dela, aproximados.
+const selecaoNoMapa = () => (estado.regiao ? { foco: ufsDaRegiao(estado.regiao) } : { selecionada: estado.uf });
+
 async function atualizarMapaEstados() {
   const { cargo } = estado;
   const nacional = CARGOS[cargo].nacional;
@@ -130,12 +162,12 @@ async function atualizarMapaEstados() {
     const [mapa, br] = await Promise.all([fonte.mapa(nacional ? cargo : 'governador'), nacional ? fonte.resultado(cargo, 'BR') : null]);
     if (cargo !== estado.cargo) return;
     const cor = br ? coresPara(`${cargo}|BR`, br.candidatos) : null;
-    atualizarMapa(mapa, { modo: nacional ? 'lider' : 'progresso', cor, selecionada: estado.uf });
+    atualizarMapa(mapa, { modo: nacional ? 'lider' : 'progresso', cor, ...selecaoNoMapa() });
     $('legenda').innerHTML = br
       ? br.candidatos.slice(0, 4).map((c) => `<span><i style="--cor:${cor(c.numero)}"></i>${esc(c.nome)}</span>`).join('')
       : '<span><i style="--cor:#D90404"></i>Quanto mais forte a cor, mais seções totalizadas</span>';
   } catch {
-    atualizarMapa(null, { selecionada: estado.uf });
+    atualizarMapa(null, selecaoNoMapa());
     $('legenda').textContent = '';
   }
 }

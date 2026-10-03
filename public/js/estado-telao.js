@@ -3,7 +3,7 @@
 // com o server.js rodando, entre aparelhos da mesma rede (o celular comanda o telão).
 // O servidor separa o estado por rede (IP de internet): de outra rede não se comanda este telão.
 import { CONFIG } from './config.js';
-import { UF_POR_SIGLA, CARGOS } from './ufs.js';
+import { UF_POR_SIGLA, CARGOS, REGIOES } from './ufs.js';
 
 export const CENAS = [
   { id: 'presidente', nome: 'Presidente', tipo: 'majoritario', cargo: 'presidente' },
@@ -24,7 +24,9 @@ const PADRAO = {
   uf: CONFIG.ufDestaque,
   // De onde vêm os votos: 'br' = Brasil todo (Presidente soma o país; os outros cargos, o estado)
   // | 'uf' = só o estado escolhido, inclusive Presidente | 'cidade' = só a cidade
+  // | 'regiao' = Presidente soma só os estados da região (os outros cargos mostram o estado)
   abrangencia: 'br',
+  regiao: UF_POR_SIGLA[CONFIG.ufDestaque]?.regiao || 'NE',
   // Cenas de deputados: 'top' = 10 mais votados | 'top20' | 'top30' | 'top50' | 'vagas' = todas as
   // cadeiras do estado | 'todos' | 'escolhidos' = só os candidatos em destaque
   deputados: 'top',
@@ -67,6 +69,7 @@ function carregar() {
   } catch {}
   const e = { ...PADRAO, ...salvo, destaques: { ...PADRAO.destaques, ...salvo.destaques }, ...pedidoDaUrl };
   if (!UF_POR_SIGLA[e.uf]) e.uf = PADRAO.uf;
+  if (!REGIOES[e.regiao]) e.regiao = PADRAO.regiao;
   if (!CENAS.some((c) => c.id === e.cena)) e.cena = PADRAO.cena;
   return e;
 }
