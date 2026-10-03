@@ -1,6 +1,7 @@
 // Estado do telão (cena, estado, cidade, destaques...). Fica no localStorage e é
 // sincronizado de dois jeitos: entre janelas do mesmo navegador (BroadcastChannel) e,
 // com o server.js rodando, entre aparelhos da mesma rede (o celular comanda o telão).
+// O servidor separa o estado por rede (IP de internet): de outra rede não se comanda este telão.
 import { CONFIG } from './config.js';
 import { UF_POR_SIGLA, CARGOS } from './ufs.js';
 
@@ -108,6 +109,7 @@ export const rede = { ligada: false, enderecos: [], aoVivo: false, banco: false 
 const aoLigarRede = new Set();
 export const aoMudarRede = (f) => aoLigarRede.add(f);
 let versaoConhecida = 0;
+let redeConhecida = '';
 
 function enviarAoServidor(alteracao) {
   if (!rede.ligada) return;
@@ -131,7 +133,13 @@ function receber(alteracao) {
 async function consultar() {
   try {
     const d = await (await fetch(API, { cache: 'no-store' })).json();
-    if (d.versao > versaoConhecida) {
+    if (d.rede !== redeConhecida) {
+      // O aparelho trocou de rede (ex.: Wi-Fi → 4G): passa a seguir o telão da rede nova,
+      // sem levar para ela o estado da rede antiga.
+      redeConhecida = d.rede;
+      versaoConhecida = d.versao || 0;
+      if (d.versao) receber(d.estado);
+    } else if (d.versao > versaoConhecida) {
       versaoConhecida = d.versao;
       if (d.origem !== MEU_ID) receber(d.estado);
     } else if (d.versao < versaoConhecida) {
@@ -148,6 +156,7 @@ async function ligarRede() {
     const d = await r.json();
     Object.assign(rede, { ligada: true, enderecos: d.enderecos || [], aoVivo: !!d.eventos, banco: !!d.banco });
     versaoConhecida = d.versao || 0;
+    redeConhecida = d.rede;
     // Primeiro aparelho a chegar: o estado dele vira o do servidor.
     if (!d.versao) enviarAoServidor(estado);
     // Consulta periódica: usada na Vercel e quando a hospedagem segura os eventos (alguns proxies fazem isso).

@@ -233,7 +233,7 @@ export function montarPainel(el, fonte) {
       ? 'Controle remoto indisponível neste endereço: vale apenas entre janelas do mesmo navegador.'
       : noEstudio && rede.enderecos.length
         ? `No celular, na mesma rede Wi-Fi, abra:<br>${rede.enderecos.map((e) => `<strong>${esc(e)}/controle</strong>`).join('<br>')}`
-        : `No celular, de qualquer rede, abra: <strong>${esc(location.origin)}/controle</strong>`;
+        : `No celular conectado à mesma rede (mesma internet) do telão, abra: <strong>${esc(location.origin)}/controle</strong>`;
     q('[data-acao="rodizio"]').textContent = estado.rodizio ? '❚❚ Pausar rodízio' : '▶ Retomar rodízio';
     q('[data-acao="rodizio"]').classList.toggle('ativo', estado.rodizio);
     const definirValor = (campo, valor) => {
