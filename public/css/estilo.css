@@ -636,15 +636,27 @@ body.telao-corpo {
   height: 9.5rem;
   font-size: 3.6rem;
 }
+.destaque > div:nth-child(2) {
+  min-width: 0; /* a coluna do nome não empurra o percentual */
+}
 .destaque-nome {
   font-size: 3.1rem;
   font-weight: 900;
   line-height: 1.05;
+  overflow-wrap: anywhere;
 }
 .destaque-sub {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
+  line-height: 1.25;
   color: var(--suave);
-  margin: 0.3rem 0 0.9rem;
+  margin: 0.3rem 0 0.8rem;
+}
+/* Partido · número numa linha e o vice na de baixo, cada uma sem quebrar. */
+.destaque-sub span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .destaque .barra {
   height: 1.3rem;

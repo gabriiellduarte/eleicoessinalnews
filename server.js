@@ -133,6 +133,7 @@ function atenderControle(req, res, url) {
 
   if (url.pathname === '/api/controle/eventos') {
     if (NA_VERCEL) return json(404, { erro: 'sem eventos nesta hospedagem; use a consulta periódica' });
+    const controle = controleDa(rede);
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
     res.write(`data: ${JSON.stringify({ versao: controle.versao, alteracao: controle.estado })}\n\n`);
     controle.clientes.add(res);

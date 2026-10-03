@@ -32,6 +32,22 @@ const cenaAtual = () => {
 };
 
 // --- cartões grandes dos primeiros colocados --------------------------------
+// Nome comprido (ex.: "Escritor Augusto Cury"): a fonte diminui até o nome caber em duas
+// linhas, para não empurrar os votos para fora do cartão.
+function caberNome(el) {
+  el.style.fontSize = '';
+  const base = parseFloat(getComputedStyle(el).fontSize);
+  const altura = parseFloat(getComputedStyle(el).lineHeight) / base;
+  for (let tam = base; tam >= base * 0.6; tam -= base * 0.04) {
+    el.style.fontSize = `${tam}px`;
+    if (el.scrollHeight <= tam * altura * 2 + 2) return;
+  }
+}
+// A largura do texto muda quando a fonte termina de carregar ou a janela muda de tamanho.
+const recaberNomes = () => document.querySelectorAll('.destaque-nome').forEach(caberNome);
+document.fonts?.ready.then(recaberNomes);
+addEventListener('resize', recaberNomes);
+
 function atualizarDuelo(candidatos, cor) {
   const duelo = $('duelo');
   const teto = Math.max(50, candidatos[0]?.pct || 0);
@@ -56,7 +72,8 @@ function atualizarDuelo(candidatos, cor) {
     }
     el.style.setProperty('--cor', cor(c.numero));
     el.querySelector('.barra i').style.width = `${Math.min(100, (c.pct / teto) * 100)}%`;
-    el.querySelector('.destaque-sub').textContent = `${c.partido} · ${c.numero}${c.vice ? ` · Vice: ${c.vice}` : ''}`;
+    el.querySelector('.destaque-sub').innerHTML = `<span>${esc(c.partido)} · ${esc(c.numero)}</span>${c.vice ? `<span>Vice: ${esc(c.vice)}</span>` : ''}`;
+    caberNome(el.querySelector('.destaque-nome'));
     el.querySelector('.destaque-pct').textContent = fmt.pct(c.pct);
     el.querySelector('.destaque-votos').textContent = `${fmt.int(c.votos)} votos`;
     const sit = el.querySelector('.sit');
@@ -166,8 +183,17 @@ function atualizarLideres(mapa, nacional, cor) {
 }
 
 // --- cenas -------------------------------------------------------------------
+// Tudo o que decide como a cena é montada. Se nada disso mudou, a cena não é desmontada:
+// os números novos entram na lista que já está na tela, sem piscar nem recomeçar.
+const montagemDaCena = () => {
+  const cena = cenaAtual();
+  return JSON.stringify([cena.id, cena.tipo, escopoDaCena(cena), estado.deputados, estado.destaques]);
+};
+let cenaMontada = '';
+
 function montarCena() {
   const cena = cenaAtual();
+  cenaMontada = montagemDaCena();
   const { uf, cidade } = escopoDaCena(cena);
   let titulo = tituloCargo(cena.cargo, uf);
   let complemento = nomeLocal(uf, cidade);
@@ -364,8 +390,13 @@ function mostrar(id) {
 
 aoMudar((e, alteracao) => {
   if (alteracao.cena && alteracao.cena !== cenaNoAr && CENAS.some((c) => c.id === alteracao.cena)) return mostrar(alteracao.cena);
-  if (['uf', 'cidade', 'abrangencia', 'destaques', 'deputados', 'lista', 'formato'].some((k) => k in alteracao)) {
+  // O estado completo chega de novo com frequência (outro aparelho abrindo o controle,
+  // consulta periódica na Vercel): só remonta a cena se algo dela mudou de verdade.
+  if (['uf', 'cidade', 'abrangencia', 'destaques', 'deputados', 'formato'].some((k) => k in alteracao) && montagemDaCena() !== cenaMontada) {
     montarCena();
+    atualizar();
+  } else if ('lista' in alteracao) {
+    // Páginas / rolagem / manual: a mesma lista, só muda o jeito de deslizar.
     atualizar();
   }
   if (['rodizio', 'tempo', 'cenasAtivas'].some((k) => k in alteracao)) {
