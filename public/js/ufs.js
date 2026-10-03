@@ -32,6 +32,9 @@ export const UFS = [
 
 export const UF_POR_SIGLA = Object.fromEntries(UFS.map((u) => [u.sigla, u]));
 
+export const REGIOES = { N: 'Norte', NE: 'Nordeste', CO: 'Centro-Oeste', SE: 'Sudeste', S: 'Sul' };
+export const ufsDaRegiao = (regiao) => UFS.filter((u) => u.regiao === regiao).map((u) => u.sigla);
+
 export const nomeLocal = (uf, cidade) => (cidade ? `${cidade} (${uf})` : uf === 'BR' ? 'Brasil' : UF_POR_SIGLA[uf]?.nome || uf);
 
 export const CARGOS = {

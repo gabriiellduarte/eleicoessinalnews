@@ -6,7 +6,7 @@
 // O layout de 2026 só pode ser confirmado quando o TSE publicar os arquivos;
 // se mudar, o ajuste fica restrito a `urls()` e `normalizar()`.
 import { CONFIG } from '../config.js';
-import { UFS, vagasDe, nomeLocal, semAcento } from '../ufs.js';
+import { UFS, REGIOES, ufsDaRegiao, vagasDe, nomeLocal, semAcento } from '../ufs.js';
 import { cadastro, nomeProprio } from './cadastro.js';
 
 const T = CONFIG.tse;
@@ -227,10 +227,58 @@ function buscar(cargo, uf, cidade = '') {
   return emCurso.get(chave);
 }
 
+// Soma os resultados dos estados de uma região (ex.: Presidente no Nordeste).
+// O TSE não publica arquivo por região: votos e seções são somados e os percentuais recalculados.
+async function regiao(cargo, sigla) {
+  const res = (await Promise.allSettled(ufsDaRegiao(sigla).map((uf) => buscar(cargo, uf)))).filter((r) => r.status === 'fulfilled').map((r) => r.value);
+  if (!res.length) throw new Error(`TSE ainda sem dados para a região ${REGIOES[sigla]}.`);
+  const soma = (campo) => res.reduce((t, r) => t + (r[campo] || 0), 0);
+  const pct = (a, b) => (b ? (a / b) * 100 : 0);
+  const porNumero = new Map();
+  for (const r of res) {
+    for (const c of r.candidatos) {
+      const acc = porNumero.get(c.numero);
+      if (acc) acc.votos += c.votos;
+      else porNumero.set(c.numero, { ...c });
+    }
+  }
+  const [secoes, secoesTotalizadas, eleitorado, comparecimento, abstencao, brancos, nulos, validos] = ['secoes', 'secoesTotalizadas', 'eleitorado', 'comparecimento', 'abstencao', 'brancos', 'nulos', 'validos'].map(soma);
+  const candidatos = [...porNumero.values()].sort((a, b) => b.votos - a.votos || a.nome.localeCompare(b.nome, 'pt-BR'));
+  candidatos.forEach((c, i) => Object.assign(c, { pos: i + 1, pct: pct(c.votos, validos) }));
+  const pctSecoes = pct(secoesTotalizadas, secoes);
+  return {
+    fonte: 'tse',
+    aguardando: res.every((r) => r.aguardando),
+    cargo,
+    uf: 'BR',
+    regiao: sigla,
+    cidade: '',
+    local: `Região ${REGIOES[sigla]}`,
+    vagas: res[0].vagas,
+    pctSecoes,
+    secoes,
+    secoesTotalizadas,
+    eleitorado,
+    comparecimento,
+    pctComparecimento: pct(comparecimento, eleitorado),
+    abstencao,
+    pctAbstencao: pct(abstencao, eleitorado),
+    brancos,
+    pctBrancos: pct(brancos, comparecimento),
+    nulos,
+    pctNulos: pct(nulos, comparecimento),
+    validos,
+    encerrada: res.every((r) => r.encerrada),
+    atualizadoEm: new Date(Math.max(...res.map((r) => +r.atualizadoEm))),
+    candidatos,
+  };
+}
+
 export const tse = {
   id: 'tse',
   intervaloMs: CONFIG.atualizacao.tseMs,
   resultado: buscar,
+  regiao,
   async mapa(cargo) {
     const res = await Promise.allSettled(UFS.map((u) => buscar(cargo, u.sigla)));
     const saida = {};

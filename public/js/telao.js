@@ -3,11 +3,11 @@
 // URL: ?uf=CE · ?cidade=Aracati (só os votos da cidade) · ?tempo=15
 //      ?cena=presidente|mapa|governador|senador|depfederal|depestadual|destaques|cidade (fixa a cena)
 import { CONFIG } from './config.js';
-import { UFS, CARGOS, nomeLocal, tituloCargo } from './ufs.js';
+import { UFS, CARGOS, REGIOES, nomeLocal, tituloCargo } from './ufs.js';
 import { fonte } from './fontes/index.js';
 import { CENAS, estado, definir, aoMudar, pedirAoEntrar, tituloDestaques } from './estado-telao.js';
 import { carregarDestaques, rotuloCargo, textoPosicao } from './destaques.js';
-import { tipoDaCena, escopoDaCena, listaDaCena, DESENHO_ROLAGEM } from './lista-telao.js';
+import { tipoDaCena, escopoDaCena, listaDaCena, resultadoNoEscopo, DESENHO_ROLAGEM } from './lista-telao.js';
 import { montarPainel } from './painel.js';
 import { montarLogo, coresPara, corDaPaleta, corDoPartido, criarLista, criarMapa, preencherStats, avatarHtml, classeSituacao, esc, fmt, resumoDefinicao } from './ui.js';
 
@@ -32,6 +32,22 @@ const cenaAtual = () => {
 };
 
 // --- cartões grandes dos primeiros colocados --------------------------------
+// Nome comprido (ex.: "Escritor Augusto Cury"): a fonte diminui até o nome caber em duas
+// linhas, para não empurrar os votos para fora do cartão.
+function caberNome(el) {
+  el.style.fontSize = '';
+  const base = parseFloat(getComputedStyle(el).fontSize);
+  const altura = parseFloat(getComputedStyle(el).lineHeight) / base;
+  for (let tam = base; tam >= base * 0.6; tam -= base * 0.04) {
+    el.style.fontSize = `${tam}px`;
+    if (el.scrollHeight <= tam * altura * 2 + 2) return;
+  }
+}
+// A largura do texto muda quando a fonte termina de carregar ou a janela muda de tamanho.
+const recaberNomes = () => document.querySelectorAll('.destaque-nome').forEach(caberNome);
+document.fonts?.ready.then(recaberNomes);
+addEventListener('resize', recaberNomes);
+
 function atualizarDuelo(candidatos, cor) {
   const duelo = $('duelo');
   const teto = Math.max(50, candidatos[0]?.pct || 0);
@@ -56,7 +72,8 @@ function atualizarDuelo(candidatos, cor) {
     }
     el.style.setProperty('--cor', cor(c.numero));
     el.querySelector('.barra i').style.width = `${Math.min(100, (c.pct / teto) * 100)}%`;
-    el.querySelector('.destaque-sub').textContent = `${c.partido} · ${c.numero}${c.vice ? ` · Vice: ${c.vice}` : ''}`;
+    el.querySelector('.destaque-sub').innerHTML = `<span>${esc(c.partido)} · ${esc(c.numero)}</span>${c.vice ? `<span>Vice: ${esc(c.vice)}</span>` : ''}`;
+    caberNome(el.querySelector('.destaque-nome'));
     el.querySelector('.destaque-pct').textContent = fmt.pct(c.pct);
     el.querySelector('.destaque-votos').textContent = `${fmt.int(c.votos)} votos`;
     const sit = el.querySelector('.sit');
@@ -166,11 +183,20 @@ function atualizarLideres(mapa, nacional, cor) {
 }
 
 // --- cenas -------------------------------------------------------------------
+// Tudo o que decide como a cena é montada. Se nada disso mudou, a cena não é desmontada:
+// os números novos entram na lista que já está na tela, sem piscar nem recomeçar.
+const montagemDaCena = () => {
+  const cena = cenaAtual();
+  return JSON.stringify([cena.id, cena.tipo, escopoDaCena(cena), estado.deputados, estado.destaques]);
+};
+let cenaMontada = '';
+
 function montarCena() {
   const cena = cenaAtual();
-  const { uf, cidade } = escopoDaCena(cena);
+  cenaMontada = montagemDaCena();
+  const { uf, cidade, regiao } = escopoDaCena(cena);
   let titulo = tituloCargo(cena.cargo, uf);
-  let complemento = nomeLocal(uf, cidade);
+  let complemento = regiao ? `Região ${REGIOES[regiao]}` : nomeLocal(uf, cidade);
   if (cena.tipo === 'mapa') titulo = 'Mapa da apuração';
   if (cena.tipo === 'destaques') [titulo, complemento] = [tituloDestaques(), uf];
   $('t-titulo').innerHTML = `${esc(titulo)} <span>· ${esc(complemento)}</span>`;
@@ -189,7 +215,8 @@ function montarCena() {
 async function atualizar() {
   const meu = ++pedido;
   const cena = cenaAtual();
-  const { uf, cidade } = escopoDaCena(cena);
+  const escopo = escopoDaCena(cena);
+  const { uf, cidade } = escopo;
   try {
     let r;
     if (cena.tipo === 'destaques') {
@@ -198,7 +225,7 @@ async function atualizar() {
       atualizarLocais(d, uf, cidade);
       r = d.referencia;
     } else {
-      const [res, mapa] = await Promise.all([fonte.resultado(cena.cargo, uf, cidade), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null]);
+      const [res, mapa] = await Promise.all([resultadoNoEscopo(fonte, cena.cargo, escopo), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null]);
       if (meu !== pedido) return;
       r = res;
       const cor = coresPara(`${cena.cargo}|${uf}`, r.candidatos);
@@ -320,11 +347,12 @@ function preCarregar(id) {
   const base = CENAS.find((c) => c.id === id);
   if (!base) return;
   const cena = { ...base, tipo: tipoDaCena(base) };
-  const { uf, cidade } = escopoDaCena(cena);
+  const escopo = escopoDaCena(cena);
+  const { uf, cidade } = escopo;
   const pedidos =
     cena.tipo === 'destaques'
       ? [carregarDestaques(fonte, { uf, cidade, numeros: estado.destaques })]
-      : [fonte.resultado(cena.cargo, uf, cidade), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null];
+      : [resultadoNoEscopo(fonte, cena.cargo, escopo), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null];
   Promise.allSettled(pedidos);
 }
 
@@ -364,8 +392,13 @@ function mostrar(id) {
 
 aoMudar((e, alteracao) => {
   if (alteracao.cena && alteracao.cena !== cenaNoAr && CENAS.some((c) => c.id === alteracao.cena)) return mostrar(alteracao.cena);
-  if (['uf', 'cidade', 'abrangencia', 'destaques', 'deputados', 'lista', 'formato'].some((k) => k in alteracao)) {
+  // O estado completo chega de novo com frequência (outro aparelho abrindo o controle,
+  // consulta periódica na Vercel): só remonta a cena se algo dela mudou de verdade.
+  if (['uf', 'cidade', 'abrangencia', 'regiao', 'destaques', 'deputados', 'formato'].some((k) => k in alteracao) && montagemDaCena() !== cenaMontada) {
     montarCena();
+    atualizar();
+  } else if ('lista' in alteracao) {
+    // Páginas / rolagem / manual: a mesma lista, só muda o jeito de deslizar.
     atualizar();
   }
   if (['rodizio', 'tempo', 'cenasAtivas'].some((k) => k in alteracao)) {

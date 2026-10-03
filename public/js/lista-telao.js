@@ -15,8 +15,12 @@ export function escopoDaCena(cena) {
   if (cena.tipo === 'mapa') return { uf: 'BR', cidade: '' };
   if (cena.tipo === 'destaques') return { uf: estado.uf, cidade: estado.cidade };
   if (CARGOS[cena.cargo].nacional && estado.abrangencia === 'br') return { uf: 'BR', cidade: '' };
+  if (estado.abrangencia === 'regiao') return CARGOS[cena.cargo].nacional ? { uf: 'BR', cidade: '', regiao: estado.regiao } : { uf: estado.uf, cidade: '' };
   return { uf: estado.uf, cidade };
 }
+
+// Resultado de um cargo no escopo da cena (estado, cidade ou soma da região).
+export const resultadoNoEscopo = (fonte, cargo, { uf, cidade, regiao }) => (regiao ? fonte.regiao(cargo, regiao) : fonte.resultado(cargo, uf, cidade));
 
 // Desenho de cada lista rolável no telão: linhas visíveis de cada vez e candidatos por linha.
 export const DESENHO_ROLAGEM = {

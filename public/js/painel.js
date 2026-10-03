@@ -1,11 +1,11 @@
 // Painel de controle do telão. Usado em dois lugares: sobreposto ao próprio
 // telão (tecla C) e na página controle.html, aberta em outro monitor.
-import { UFS, UF_POR_SIGLA, CARGOS, semAcento } from './ufs.js';
+import { UFS, UF_POR_SIGLA, CARGOS, REGIOES, ufsDaRegiao, semAcento } from './ufs.js';
 import { CENAS, estado, definir, aoMudar, restaurarPadrao, rede, aoMudarRede } from './estado-telao.js';
-import { criarMapa, esc, fmt } from './ui.js';
+import { criarMapa, criarMenuMapa, esc, fmt } from './ui.js';
 import { cadastro } from './fontes/cadastro.js';
 import { lerNumeros } from './destaques.js';
-import { tipoDaCena, escopoDaCena, itensRolaveis, DESENHO_ROLAGEM } from './lista-telao.js';
+import { tipoDaCena, escopoDaCena, itensRolaveis, resultadoNoEscopo, DESENHO_ROLAGEM } from './lista-telao.js';
 
 const rotulo = (cargo) => CARGOS[cargo].abreviado || CARGOS[cargo].titulo;
 // Presidente é cadastrado no país; os demais cargos, no estado escolhido.
@@ -36,7 +36,8 @@ export function montarPainel(el, fonte) {
 
     <section>
       <h3>Estado</h3>
-      <div class="p-mapa"></div>
+      <p class="p-dica">Clique num estado para escolher o estado ou a região dele (a região vale para Presidente).</p>
+      <div class="mapa-area p-mapa-area"><div class="p-mapa"></div></div>
       <select data-campo="uf" aria-label="Estado">
         ${[...UFS].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((u) => `<option value="${u.sigla}">${u.nome}</option>`).join('')}
       </select>
@@ -48,8 +49,12 @@ export function montarPainel(el, fonte) {
         <button type="button" data-abr="br">Brasil todo</button>
         <button type="button" data-abr="uf">Só o estado</button>
         <button type="button" data-abr="cidade">Só a cidade</button>
+        <button type="button" data-abr="regiao">Só a região</button>
       </div>
-      <p class="p-dica">"Brasil todo": Presidente soma o país e os outros cargos mostram o estado. "Só o estado": Presidente também mostra só os votos do estado. "Só a cidade": todos os cargos mostram os votos da cidade escolhida abaixo.</p>
+      <select data-campo="regiao" aria-label="Região">
+        ${Object.entries(REGIOES).map(([sigla, nome]) => `<option value="${sigla}">Região ${nome}</option>`).join('')}
+      </select>
+      <p class="p-dica">"Brasil todo": Presidente soma o país e os outros cargos mostram o estado. "Só o estado": Presidente também mostra só os votos do estado. "Só a cidade": todos os cargos mostram os votos da cidade escolhida abaixo. "Só a região": Presidente soma os votos dos estados da região escolhida; os outros cargos mostram o estado.</p>
       <p class="p-atual">Cidade escolhida: <strong data-cidade-atual></strong></p>
       <input type="search" data-filtro-cidade placeholder="Filtrar cidades" aria-label="Filtrar cidades">
       <ul class="p-lista" data-lista="cidades"></ul>
@@ -113,7 +118,14 @@ export function montarPainel(el, fonte) {
     </section>`;
 
   const q = (s) => el.querySelector(s);
-  const atualizarMapa = criarMapa(q('.p-mapa'), (uf) => trocarUf(uf));
+  const atualizarMapa = criarMapa(q('.p-mapa'), (uf, e) => {
+    const u = UF_POR_SIGLA[uf];
+    menuMapa.abrir(e, u.nome, [
+      { rotulo: `Ver estado: ${u.nome}`, valor: uf },
+      { rotulo: `Ver Região ${REGIOES[u.regiao]} (Presidente)`, valor: `R:${u.regiao}` },
+    ]);
+  });
+  const menuMapa = criarMenuMapa(q('.p-mapa-area'), (valor) => (valor.startsWith('R:') ? escolherRegiao(valor.slice(2)) : trocarUf(valor)));
   const filtro = { cargo: 'depfederal', partido: '', texto: '', cidade: '' };
   q('[data-filtro="cargo"]').value = filtro.cargo;
 
@@ -157,6 +169,11 @@ export function montarPainel(el, fonte) {
     // A cidade anterior não pertence ao novo estado: passa a ser a capital.
     if (uf === estado.uf && estado.abrangencia === 'uf') return;
     definir({ uf, abrangencia: 'uf', ...(uf !== estado.uf && { cidade: UF_POR_SIGLA[uf].capital }) });
+  }
+
+  // A soma por região só existe para Presidente: se outra cena está no ar, entra a de Presidente.
+  function escolherRegiao(regiao) {
+    definir({ abrangencia: 'regiao', regiao, ...(estado.cena !== 'presidente' && { cena: 'presidente' }) });
   }
 
   // --- candidatos -------------------------------------------------------------
@@ -233,7 +250,7 @@ export function montarPainel(el, fonte) {
       ? 'Controle remoto indisponível neste endereço: vale apenas entre janelas do mesmo navegador.'
       : noEstudio && rede.enderecos.length
         ? `No celular, na mesma rede Wi-Fi, abra:<br>${rede.enderecos.map((e) => `<strong>${esc(e)}/controle</strong>`).join('<br>')}`
-        : `No celular, de qualquer rede, abra: <strong>${esc(location.origin)}/controle</strong>`;
+        : `No celular conectado à mesma rede (mesma internet) do telão, abra: <strong>${esc(location.origin)}/controle</strong>`;
     q('[data-acao="rodizio"]').textContent = estado.rodizio ? '❚❚ Pausar rodízio' : '▶ Retomar rodízio';
     q('[data-acao="rodizio"]').classList.toggle('ativo', estado.rodizio);
     const definirValor = (campo, valor) => {
@@ -241,8 +258,9 @@ export function montarPainel(el, fonte) {
     };
     definirValor(q('[data-campo="tempo"]'), estado.tempo);
     definirValor(q('[data-campo="uf"]'), estado.uf);
+    definirValor(q('[data-campo="regiao"]'), estado.regiao);
     definirValor(q('[data-dest="titulo"]'), estado.destaques.titulo || '');
-    atualizarMapa(null, { selecionada: estado.uf });
+    atualizarMapa(null, estado.abrangencia === 'regiao' ? { foco: ufsDaRegiao(estado.regiao) } : { selecionada: estado.uf });
     if (ufDasCidades !== estado.uf) carregarCidades();
     else mostrarCidades();
     mostrarCandidatos();
@@ -274,6 +292,7 @@ export function montarPainel(el, fonte) {
       definir({ cenasAtivas: ativas });
     } else if (t.dataset.campo === 'tempo') definir({ tempo: Math.min(600, Math.max(3, Number(t.value) || 15)) });
     else if (t.dataset.campo === 'uf') trocarUf(t.value);
+    else if (t.dataset.campo === 'regiao') escolherRegiao(t.value);
     else if (t.dataset.dest) definir({ destaques: { ...estado.destaques, [t.dataset.dest]: t.value.trim() } });
     else if (t.dataset.filtro === 'cargo' || t.dataset.filtro === 'partido') {
       filtro[t.dataset.filtro] = t.value;
@@ -317,11 +336,10 @@ export function montarPainel(el, fonte) {
       aviso.textContent = 'A cena no ar não tem lista para rolar (mapa ou destaques).';
       return;
     }
-    const { uf, cidade } = escopoDaCena(cena);
     const { cargo } = cena;
     let r;
     try {
-      r = await fonte.resultado(cargo, uf, cidade);
+      r = await resultadoNoEscopo(fonte, cargo, escopoDaCena(cena));
     } catch {
       aviso.textContent = 'Não foi possível carregar a lista.';
       return;

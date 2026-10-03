@@ -1,8 +1,9 @@
 // Estado do telão (cena, estado, cidade, destaques...). Fica no localStorage e é
 // sincronizado de dois jeitos: entre janelas do mesmo navegador (BroadcastChannel) e,
 // com o server.js rodando, entre aparelhos da mesma rede (o celular comanda o telão).
+// O servidor separa o estado por rede (IP de internet): de outra rede não se comanda este telão.
 import { CONFIG } from './config.js';
-import { UF_POR_SIGLA, CARGOS } from './ufs.js';
+import { UF_POR_SIGLA, CARGOS, REGIOES } from './ufs.js';
 
 export const CENAS = [
   { id: 'presidente', nome: 'Presidente', tipo: 'majoritario', cargo: 'presidente' },
@@ -23,7 +24,9 @@ const PADRAO = {
   uf: CONFIG.ufDestaque,
   // De onde vêm os votos: 'br' = Brasil todo (Presidente soma o país; os outros cargos, o estado)
   // | 'uf' = só o estado escolhido, inclusive Presidente | 'cidade' = só a cidade
+  // | 'regiao' = Presidente soma só os estados da região (os outros cargos mostram o estado)
   abrangencia: 'br',
+  regiao: UF_POR_SIGLA[CONFIG.ufDestaque]?.regiao || 'NE',
   // Cenas de deputados: 'top' = 10 mais votados | 'top20' | 'top30' | 'top50' | 'vagas' = todas as
   // cadeiras do estado | 'todos' | 'escolhidos' = só os candidatos em destaque
   deputados: 'top',
@@ -66,6 +69,7 @@ function carregar() {
   } catch {}
   const e = { ...PADRAO, ...salvo, destaques: { ...PADRAO.destaques, ...salvo.destaques }, ...pedidoDaUrl };
   if (!UF_POR_SIGLA[e.uf]) e.uf = PADRAO.uf;
+  if (!REGIOES[e.regiao]) e.regiao = PADRAO.regiao;
   if (!CENAS.some((c) => c.id === e.cena)) e.cena = PADRAO.cena;
   return e;
 }
@@ -108,6 +112,7 @@ export const rede = { ligada: false, enderecos: [], aoVivo: false, banco: false 
 const aoLigarRede = new Set();
 export const aoMudarRede = (f) => aoLigarRede.add(f);
 let versaoConhecida = 0;
+let redeConhecida = '';
 
 function enviarAoServidor(alteracao) {
   if (!rede.ligada) return;
@@ -131,7 +136,13 @@ function receber(alteracao) {
 async function consultar() {
   try {
     const d = await (await fetch(API, { cache: 'no-store' })).json();
-    if (d.versao > versaoConhecida) {
+    if (d.rede !== redeConhecida) {
+      // O aparelho trocou de rede (ex.: Wi-Fi → 4G): passa a seguir o telão da rede nova,
+      // sem levar para ela o estado da rede antiga.
+      redeConhecida = d.rede;
+      versaoConhecida = d.versao || 0;
+      if (d.versao) receber(d.estado);
+    } else if (d.versao > versaoConhecida) {
       versaoConhecida = d.versao;
       if (d.origem !== MEU_ID) receber(d.estado);
     } else if (d.versao < versaoConhecida) {
@@ -148,6 +159,7 @@ async function ligarRede() {
     const d = await r.json();
     Object.assign(rede, { ligada: true, enderecos: d.enderecos || [], aoVivo: !!d.eventos, banco: !!d.banco });
     versaoConhecida = d.versao || 0;
+    redeConhecida = d.rede;
     // Primeiro aparelho a chegar: o estado dele vira o do servidor.
     if (!d.versao) enviarAoServidor(estado);
     // Consulta periódica: usada na Vercel e quando a hospedagem segura os eventos (alguns proxies fazem isso).

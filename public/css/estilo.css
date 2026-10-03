@@ -636,15 +636,27 @@ body.telao-corpo {
   height: 9.5rem;
   font-size: 3.6rem;
 }
+.destaque > div:nth-child(2) {
+  min-width: 0; /* a coluna do nome não empurra o percentual */
+}
 .destaque-nome {
   font-size: 3.1rem;
   font-weight: 900;
   line-height: 1.05;
+  overflow-wrap: anywhere;
 }
 .destaque-sub {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
+  line-height: 1.25;
   color: var(--suave);
-  margin: 0.3rem 0 0.9rem;
+  margin: 0.3rem 0 0.8rem;
+}
+/* Partido · número numa linha e o vice na de baixo, cada uma sem quebrar. */
+.destaque-sub span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .destaque .barra {
   height: 1.3rem;
@@ -1336,6 +1348,74 @@ body.mouse .t-engrenagem {
 .telao-corpo .ranking .cand-pos {
   width: 4.2rem;
   text-align: right;
+}
+
+/* ---------- menu do mapa: ver estado ou região (Presidente) ---------- */
+.mapa-dica {
+  margin: -0.3rem 0 0.6rem;
+  font-size: 0.78rem;
+  color: var(--suave);
+}
+.mapa-area {
+  position: relative;
+}
+.mapa-voltar {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  border: 1px solid var(--linha);
+  border-radius: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  background: var(--painel);
+  cursor: pointer;
+}
+.mapa-voltar:hover,
+.mapa-voltar:focus-visible {
+  background: var(--vermelho);
+  border-color: var(--vermelho);
+  color: #fff;
+}
+/* Fora da região escolhida: o estado some quase todo e não recebe clique. */
+.mapa-svg .uf.apagado {
+  opacity: 0.12;
+  pointer-events: none;
+}
+.mapa-rotulos .apagado {
+  visibility: hidden;
+}
+.mapa-menu {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  gap: 0.3rem;
+  min-width: 13rem;
+  max-width: 100%;
+  padding: 0.6rem;
+  background: var(--painel);
+  border: 1px solid var(--linha);
+  border-radius: 0.4rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.mapa-menu strong {
+  font-size: 0.85rem;
+  padding: 0 0.2rem 0.2rem;
+}
+.mapa-menu button {
+  border: 0;
+  border-radius: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  font-size: 0.85rem;
+  background: var(--trilho);
+  cursor: pointer;
+}
+.mapa-menu button:hover,
+.mapa-menu button:focus-visible {
+  background: var(--vermelho);
+  color: #fff;
+  outline: none;
 }
 
 /* ---------- mapa real dos estados (SVG) ---------- */
