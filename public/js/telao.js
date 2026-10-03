@@ -304,12 +304,28 @@ function desenharRanking() {
 setInterval(desenharRanking, 1000);
 
 let temporizador;
+let preCarga;
 function agendarRodizio() {
   clearTimeout(temporizador);
+  clearTimeout(preCarga);
   if (!estado.rodizio) return;
   const duracao = Math.max(estado.tempo * 1000, duracaoMinimaCena);
   const restante = Math.max(1000, duracao - (Date.now() - cenaDesde));
   temporizador = setTimeout(() => mostrar(vizinha(1)), restante);
+  // Os dados da próxima cena chegam antes da troca: ela já entra preenchida.
+  preCarga = setTimeout(() => preCarregar(vizinha(1)), Math.max(0, restante - 3000));
+}
+
+function preCarregar(id) {
+  const base = CENAS.find((c) => c.id === id);
+  if (!base) return;
+  const cena = { ...base, tipo: tipoDaCena(base) };
+  const { uf, cidade } = escopoDaCena(cena);
+  const pedidos =
+    cena.tipo === 'destaques'
+      ? [carregarDestaques(fonte, { uf, cidade, numeros: estado.destaques })]
+      : [fonte.resultado(cena.cargo, uf, cidade), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null];
+  Promise.allSettled(pedidos);
 }
 
 // Próxima (ou anterior) cena. No rodízio automático só entram as marcadas no painel.
@@ -425,9 +441,17 @@ addEventListener('keydown', (e) => {
   else if (tecla === 'h') $('ajuda').hidden = !$('ajuda').hidden;
 });
 
+// Atualização contínua, sem recarregar a página. Cada rodada só começa quando a anterior
+// termina: se o TSE ficar lento, os pedidos não se acumulam.
+function repetir(tarefa, ms) {
+  const rodada = async () => {
+    await tarefa().catch(() => {});
+    setTimeout(rodada, ms);
+  };
+  rodada();
+}
+
 montarCena();
-atualizar();
 agendarRodizio();
-setInterval(atualizar, fonte.intervaloMs);
-atualizarTicker();
-setInterval(atualizarTicker, Math.max(10000, fonte.intervaloMs));
+repetir(atualizar, fonte.intervaloMs);
+repetir(atualizarTicker, Math.max(10000, fonte.intervaloMs));

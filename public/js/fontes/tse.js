@@ -172,23 +172,59 @@ async function aguardando(cargo, uf, cidade) {
 
 // Lembra qual endereço respondeu para cada cargo, para tentá-lo primeiro nas próximas vezes.
 const indiceBom = {};
-const ultimos = new Map();
+const ultimos = new Map(); // chave → { resultado, em }
+const emCurso = new Map(); // chave → consulta em andamento
+const porUrl = new Map(); // url → { etag, resultado }
+// Um resultado buscado há menos que isso é reaproveitado: o telão, a faixa de estados e os
+// destaques pedem os mesmos arquivos em momentos próximos.
+const FRESCO_MS = Math.min(5000, CONFIG.atualizacao.tseMs / 2);
+const ESPERA_MAX_MS = 8000;
 
-async function buscar(cargo, uf, cidade = '') {
-  const chave = `${cargo}|${uf}|${cidade}`;
+// Baixa um arquivo do TSE. Se ele não mudou desde a última vez (ETag), o servidor responde
+// só "304 · não mudou" e o resultado já convertido é reaproveitado, sem baixar nem converter de novo.
+async function baixar(url, cargo, uf, cidade) {
+  const anterior = porUrl.get(url);
+  const r = await fetch(url, {
+    cache: 'no-store',
+    headers: anterior?.etag ? { 'If-None-Match': anterior.etag } : {},
+    signal: AbortSignal.timeout(ESPERA_MAX_MS),
+  }).catch(() => null);
+  if (r?.status === 304 && anterior) return anterior.resultado;
+  if (!r?.ok) throw new Error('indisponível');
+  const resultado = await enriquecer(normalizar(await r.json(), cargo, uf, cidade));
+  porUrl.set(url, { etag: r.headers.get('etag') || '', resultado });
+  return resultado;
+}
+
+async function consultar(cargo, uf, cidade, chave) {
   const lista = urls(cargo, uf, cidade ? await codigoMunicipio(uf, cidade) : '');
-  const ordem = lista.map((_, i) => i).sort((a, b) => (b === indiceBom[cargo]) - (a === indiceBom[cargo]));
-  for (const i of ordem) {
-    const r = await fetch(lista[i], { cache: 'no-store' }).catch(() => null);
-    if (r?.ok) {
-      indiceBom[cargo] = i;
-      const resultado = await enriquecer(normalizar(await r.json(), cargo, uf, cidade));
-      ultimos.set(chave, resultado);
-      return resultado;
+  const bom = indiceBom[cargo] ?? 0;
+  const tentar = (i) => baixar(lista[i], cargo, uf, cidade).then((resultado) => ((indiceBom[cargo] = i), resultado));
+  let resultado = await tentar(bom).catch(() => null);
+  // O endereço de sempre falhou: os outros são tentados ao mesmo tempo, não um depois do outro.
+  if (!resultado) {
+    const outros = lista.map((_, i) => i).filter((i) => i !== bom);
+    const respostas = await Promise.allSettled(outros.map(tentar));
+    const achada = respostas.findIndex((x) => x.status === 'fulfilled');
+    if (achada >= 0) {
+      indiceBom[cargo] = outros[achada];
+      resultado = respostas[achada].value;
     }
   }
+  if (resultado) {
+    ultimos.set(chave, { resultado, em: Date.now() });
+    return resultado;
+  }
   // Falha passageira no meio da apuração: mantém o último resultado bom, nunca volta a zero.
-  return ultimos.get(chave) || aguardando(cargo, uf, cidade);
+  return ultimos.get(chave)?.resultado || aguardando(cargo, uf, cidade);
+}
+
+function buscar(cargo, uf, cidade = '') {
+  const chave = `${cargo}|${uf}|${cidade}`;
+  const ultimo = ultimos.get(chave);
+  if (ultimo && Date.now() - ultimo.em < FRESCO_MS) return Promise.resolve(ultimo.resultado);
+  if (!emCurso.has(chave)) emCurso.set(chave, consultar(cargo, uf, cidade, chave).finally(() => emCurso.delete(chave)));
+  return emCurso.get(chave);
 }
 
 export const tse = {

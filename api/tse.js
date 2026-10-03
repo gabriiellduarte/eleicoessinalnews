@@ -2,4 +2,4 @@
 const { atender } = require('../tse-proxy');
 const caminhoDe = require('./_caminho');
 
-module.exports = (req, res) => atender(caminhoDe(req, 'tse'), res);
+module.exports = (req, res) => atender(caminhoDe(req, 'tse'), res, req);
