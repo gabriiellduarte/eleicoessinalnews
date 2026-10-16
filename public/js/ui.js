@@ -68,12 +68,12 @@ export function classeSituacao(c) {
   return '';
 }
 
-// Resumo da disputa majoritária já definida: eleito(s) no 1º turno ou quem vai ao 2º turno.
+// Resumo da disputa majoritária já definida: quem foi eleito ou quem vai ao 2º turno.
 export function resumoDefinicao(candidatos) {
   const eleitos = candidatos.filter((c) => c.eleito);
   if (eleitos.length) {
     const nomes = eleitos.map((c) => c.nome).join(' e ');
-    return { classe: 'eleito', texto: eleitos.length > 1 ? `Eleitos: ${nomes}` : `Eleito no 1º turno: ${nomes}` };
+    return { classe: 'eleito', texto: eleitos.length > 1 ? `Eleitos: ${nomes}` : `Eleito no ${CONFIG.turno}º turno: ${nomes}` };
   }
   const segundo = candidatos.filter((c) => classeSituacao(c) === 'turno2');
   if (segundo.length) return { classe: 'turno2', texto: `2º turno: ${segundo.map((c) => c.nome).join(' × ')}` };
@@ -252,7 +252,7 @@ export function criarMapa(el, aoClicar) {
       p.classList.toggle('sel', escolhidas.has(u.sigla));
       // O estado escolhido vai para o fim do grupo, para o contorno ficar por cima dos vizinhos.
       if (escolhidas.has(u.sigla) && p.nextSibling) p.parentNode.appendChild(p);
-      p.style.setProperty('--cor', temVoto ? (modo === 'lider' ? cor(lider.numero) : '#D90404') : '');
+      p.style.setProperty('--cor', temVoto ? (modo === 'lider' ? cor(lider.numero, u.sigla) : '#D90404') : '');
       p.style.setProperty('--forca', temVoto ? (0.35 + 0.65 * (r.pctSecoes / 100)).toFixed(2) : '');
       p.querySelector('title').textContent = temVoto ? `${u.nome}: ${lider.nome} ${fmt.pct(lider.pct)} · ${fmt.pct(r.pctSecoes)} das seções` : u.nome;
       rotulo[u.sigla].classList.toggle('sobre-cor', temVoto);

@@ -2,20 +2,19 @@
 // sincronizado de dois jeitos: entre janelas do mesmo navegador (BroadcastChannel) e,
 // com o server.js rodando, entre aparelhos da mesma rede (o celular comanda o telão).
 // O servidor separa o estado por rede (IP de internet): de outra rede não se comanda este telão.
-import { CONFIG } from './config.js';
+import { CONFIG, UFS_GOVERNADOR } from './config.js';
 import { UF_POR_SIGLA, CARGOS, REGIOES } from './ufs.js';
 
+// 2º turno: Presidente, o mapa e uma cena de Governador para cada estado com 2º turno
+// (a cena de governador mostra sempre o seu estado, qualquer que seja o estado escolhido no painel).
 export const CENAS = [
   { id: 'presidente', nome: 'Presidente', tipo: 'majoritario', cargo: 'presidente' },
   { id: 'mapa', nome: 'Mapa Brasil', tipo: 'mapa', cargo: 'presidente' },
-  { id: 'governador', nome: 'Governador', tipo: 'majoritario', cargo: 'governador' },
-  { id: 'senador', nome: 'Senador', tipo: 'majoritario', cargo: 'senador' },
-  { id: 'depfederal', nome: 'Dep. Federal', tipo: 'proporcional', cargo: 'depfederal' },
-  { id: 'depestadual', nome: 'Dep. Estadual', tipo: 'proporcional', cargo: 'depestadual' },
-  { id: 'destaques', nome: 'Destaques', tipo: 'destaques', cargo: 'depfederal' },
+  ...UFS_GOVERNADOR.map((uf) => ({ id: `gov-${uf.toLowerCase()}`, nome: `Governador ${uf}`, tipo: 'majoritario', cargo: 'governador', uf })),
 ];
 
-const CHAVE = 'sinal-telao-estado';
+// Chave nova no 2º turno: o estado salvo no 1º turno tinha outras cenas.
+const CHAVE = 'sinal-telao-estado-2t';
 const PADRAO = {
   cena: 'presidente',
   rodizio: false, // o telão abre parado; o operador liga o rodízio pelo controle
@@ -74,6 +73,9 @@ function carregar() {
   return e;
 }
 
+// Lista de cenas do rodízio vinda de um aparelho ainda no 1º turno (senador, deputados...): volta ao padrão.
+const cenasValidas = (ids) => (Array.isArray(ids) && ids.every((id) => CENAS.some((c) => c.id === id)) ? ids : PADRAO.cenasAtivas);
+
 export const estado = carregar();
 
 const canal = 'BroadcastChannel' in window ? new BroadcastChannel('sinal-telao') : null;
@@ -83,6 +85,7 @@ const ouvintes = new Set();
 export const aoMudar = (f) => ouvintes.add(f);
 
 function aplicar(alteracao, remoto) {
+  if ('cenasAtivas' in alteracao) alteracao = { ...alteracao, cenasAtivas: cenasValidas(alteracao.cenasAtivas) };
   Object.assign(estado, alteracao);
   try {
     localStorage.setItem(CHAVE, JSON.stringify(estado));

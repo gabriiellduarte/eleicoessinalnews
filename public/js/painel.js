@@ -1,15 +1,9 @@
 // Painel de controle do telão. Usado em dois lugares: sobreposto ao próprio
 // telão (tecla C) e na página controle.html, aberta em outro monitor.
-import { UFS, UF_POR_SIGLA, CARGOS, REGIOES, ufsDaRegiao, semAcento } from './ufs.js';
+import { UFS, UF_POR_SIGLA, REGIOES, ufsDaRegiao, semAcento } from './ufs.js';
 import { CENAS, estado, definir, aoMudar, restaurarPadrao, rede, aoMudarRede } from './estado-telao.js';
 import { criarMapa, criarMenuMapa, esc, fmt } from './ui.js';
-import { cadastro } from './fontes/cadastro.js';
-import { lerNumeros } from './destaques.js';
 import { tipoDaCena, escopoDaCena, itensRolaveis, resultadoNoEscopo, DESENHO_ROLAGEM } from './lista-telao.js';
-
-const rotulo = (cargo) => CARGOS[cargo].abreviado || CARGOS[cargo].titulo;
-// Presidente é cadastrado no país; os demais cargos, no estado escolhido.
-const ufDoCadastro = (cargo) => (CARGOS[cargo].nacional ? 'BR' : estado.uf);
 
 export function montarPainel(el, fonte) {
   el.classList.add('painel');
@@ -54,7 +48,7 @@ export function montarPainel(el, fonte) {
       <select data-campo="regiao" aria-label="Região">
         ${Object.entries(REGIOES).map(([sigla, nome]) => `<option value="${sigla}">Região ${nome}</option>`).join('')}
       </select>
-      <p class="p-dica">"Brasil todo": Presidente soma o país e os outros cargos mostram o estado. "Só o estado": Presidente também mostra só os votos do estado. "Só a cidade": todos os cargos mostram os votos da cidade escolhida abaixo. "Só a região": Presidente soma os votos dos estados da região escolhida; os outros cargos mostram o estado.</p>
+      <p class="p-dica">"Brasil todo": Presidente soma o país. "Só o estado": Presidente mostra só os votos do estado. "Só a cidade": Presidente mostra os votos da cidade escolhida abaixo (e o Governador também, se a cidade for de um estado com 2º turno). "Só a região": Presidente soma os votos dos estados da região escolhida. Cada cena de Governador mostra sempre o seu estado.</p>
       <p class="p-atual">Cidade escolhida: <strong data-cidade-atual></strong></p>
       <input type="search" data-filtro-cidade placeholder="Filtrar cidades" aria-label="Filtrar cidades">
       <ul class="p-lista" data-lista="cidades"></ul>
@@ -63,27 +57,10 @@ export function montarPainel(el, fonte) {
 
     <section>
       <h3>Lista no ar</h3>
-      <p class="p-atual">Presidente, Governador e Senador:</p>
+      <p class="p-atual">Presidente e Governador:</p>
       <div class="p-linha p-abr">
         <button type="button" data-formato="destaque">2 em destaque</button>
         <button type="button" data-formato="lista">Lista completa</button>
-      </div>
-      <p class="p-dica" data-espelho-aviso></p>
-      <ol class="p-espelho" data-espelho></ol>
-    </section>
-
-    <section>
-      <h3>Candidatos em destaque</h3>
-      <label>Título da cena <input type="text" data-dest="titulo" placeholder="Candidatos de (cidade)"></label>
-      <p class="p-atual">Nas cenas Dep. Federal e Dep. Estadual, mostrar:</p>
-      <div class="p-linha p-abr">
-        <button type="button" data-dep="top">10 mais votados</button>
-        <button type="button" data-dep="top20">20</button>
-        <button type="button" data-dep="top30">30</button>
-        <button type="button" data-dep="top50">50</button>
-        <button type="button" data-dep="vagas">Todas as vagas</button>
-        <button type="button" data-dep="todos">Todos</button>
-        <button type="button" data-dep="escolhidos">Só os escolhidos</button>
       </div>
       <p class="p-atual">Quando passar de 10 nomes:</p>
       <div class="p-linha p-abr">
@@ -96,19 +73,8 @@ export function montarPainel(el, fonte) {
         <button type="button" data-rolar="-1" aria-label="Subir">▲ Subir</button>
         <button type="button" data-rolar="1" aria-label="Descer">▼ Descer</button>
       </div>
-      <p class="p-dica">"Todas as vagas" mostra os mais votados até o número de cadeiras do estado. Nas setas, cada toque move uma linha (dois candidatos) no telão; a cena fica no ar até a lista inteira passar.</p>
-      <p class="p-atual">Escolhidos:</p>
-      <ul class="p-escolhidos"></ul>
-      <p class="p-atual">Lista oficial do TSE — clique para incluir ou tirar:</p>
-      <div class="p-filtros">
-        <select data-filtro="cargo" aria-label="Cargo">
-          ${Object.keys(CARGOS).map((c) => `<option value="${c}">${esc(CARGOS[c].titulo)}</option>`).join('')}
-        </select>
-        <select data-filtro="partido" aria-label="Partido"></select>
-      </div>
-      <input type="search" data-filtro="texto" placeholder="Filtrar por nome ou número (opcional)" aria-label="Filtrar candidatos">
-      <ul class="p-lista" data-lista="candidatos"></ul>
-      <p class="p-status" data-status="candidatos"></p>
+      <p class="p-dica" data-espelho-aviso></p>
+      <ol class="p-espelho" data-espelho></ol>
     </section>
 
     <section>
@@ -126,8 +92,7 @@ export function montarPainel(el, fonte) {
     ]);
   });
   const menuMapa = criarMenuMapa(q('.p-mapa-area'), (valor) => (valor.startsWith('R:') ? escolherRegiao(valor.slice(2)) : trocarUf(valor)));
-  const filtro = { cargo: 'depfederal', partido: '', texto: '', cidade: '' };
-  q('[data-filtro="cargo"]').value = filtro.cargo;
+  const filtro = { cidade: '' };
 
   // --- cidades ----------------------------------------------------------------
   let cidades = [];
@@ -176,70 +141,11 @@ export function montarPainel(el, fonte) {
     definir({ abrangencia: 'regiao', regiao, ...(estado.cena !== 'presidente' && { cena: 'presidente' }) });
   }
 
-  // --- candidatos -------------------------------------------------------------
-  let pedidoCandidatos = 0;
-
-  async function mostrarCandidatos() {
-    const meu = ++pedidoCandidatos;
-    const { cargo } = filtro;
-    const status = q('[data-status="candidatos"]');
-    const ul = q('[data-lista="candidatos"]');
-    let lista;
-    try {
-      if (!ul.children.length) status.textContent = 'Carregando candidatos do TSE…';
-      lista = await cadastro.candidatos(cargo, ufDoCadastro(cargo));
-    } catch {
-      if (meu !== pedidoCandidatos) return;
-      ul.innerHTML = '';
-      status.innerHTML = 'Não foi possível carregar a lista do TSE. <button type="button" data-acao="recarregar">Tentar de novo</button>';
-      return;
-    }
-    if (meu !== pedidoCandidatos) return;
-
-    const partidos = [...new Set(lista.map((c) => c.partido))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    if (!partidos.includes(filtro.partido)) filtro.partido = '';
-    q('[data-filtro="partido"]').innerHTML = `<option value="">Todos os partidos (${partidos.length})</option>` + partidos.map((p) => `<option>${esc(p)}</option>`).join('');
-    q('[data-filtro="partido"]').value = filtro.partido;
-
-    const texto = semAcento(filtro.texto);
-    const escolhidos = new Set(lerNumeros(estado.destaques[cargo]));
-    const visiveis = lista
-      .filter((c) => (!filtro.partido || c.partido === filtro.partido) && (!texto || semAcento(c.nome).includes(texto) || c.numero.includes(texto)))
-      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-    ul.innerHTML = visiveis
-      .map((c) => `<li><button type="button" data-cand="${esc(c.numero)}" class="${escolhidos.has(c.numero) ? 'ativo' : ''}"><span>${esc(c.nome)}</span><small>${esc(c.partido)} · ${esc(c.numero)}</small></button></li>`)
-      .join('');
-    const onde = CARGOS[cargo].nacional ? 'Brasil' : UF_POR_SIGLA[estado.uf].nome;
-    status.textContent = `${visiveis.length} de ${lista.length} candidatos a ${CARGOS[cargo].titulo} · ${onde}`;
-  }
-
-  async function mostrarEscolhidos() {
-    const linhas = [];
-    for (const cargo of Object.keys(CARGOS)) {
-      const numeros = lerNumeros(estado.destaques[cargo]);
-      if (!numeros.length) continue;
-      const lista = await cadastro.candidatos(cargo, ufDoCadastro(cargo)).catch(() => []);
-      for (const n of numeros) {
-        const c = lista.find((x) => x.numero === n);
-        const nome = c ? `${esc(c.nome)} (${esc(c.partido)})` : '<em>não está na lista do TSE deste estado</em>';
-        linhas.push(`<li><span>${esc(rotulo(cargo))} · ${esc(n)} · ${nome}</span><button type="button" data-remover="${cargo}|${esc(n)}" aria-label="Remover">✕</button></li>`);
-      }
-    }
-    q('.p-escolhidos').innerHTML = linhas.join('') || '<li><em>Nenhum candidato escolhido ainda.</em></li>';
-  }
-
-  function alternarDestaque(cargo, numero) {
-    const atuais = lerNumeros(estado.destaques[cargo]);
-    const novos = atuais.includes(numero) ? atuais.filter((n) => n !== numero) : [...atuais, numero];
-    definir({ destaques: { ...estado.destaques, [cargo]: novos.join(', ') } });
-  }
-
   // --- sincronização com o estado do telão ---------------------------------------
   function sincronizar() {
     el.querySelectorAll('[data-cena]').forEach((b) => b.classList.toggle('ativo', b.dataset.cena === estado.cena));
     el.querySelectorAll('[data-ativa]').forEach((c) => (c.checked = estado.cenasAtivas.includes(c.dataset.ativa)));
     el.querySelectorAll('[data-abr]').forEach((b) => b.classList.toggle('ativo', b.dataset.abr === estado.abrangencia));
-    el.querySelectorAll('[data-dep]').forEach((b) => b.classList.toggle('ativo', b.dataset.dep === estado.deputados));
     el.querySelectorAll('[data-lista]').forEach((b) => b.classList.toggle('ativo', b.dataset.lista === (estado.lista || 'paginas')));
     q('.p-rolar').hidden = estado.lista !== 'manual';
     el.querySelectorAll('[data-formato]').forEach((b) => b.classList.toggle('ativo', b.dataset.formato === (estado.formato || 'destaque')));
@@ -259,24 +165,18 @@ export function montarPainel(el, fonte) {
     definirValor(q('[data-campo="tempo"]'), estado.tempo);
     definirValor(q('[data-campo="uf"]'), estado.uf);
     definirValor(q('[data-campo="regiao"]'), estado.regiao);
-    definirValor(q('[data-dest="titulo"]'), estado.destaques.titulo || '');
     atualizarMapa(null, estado.abrangencia === 'regiao' ? { foco: ufsDaRegiao(estado.regiao) } : { selecionada: estado.uf });
     if (ufDasCidades !== estado.uf) carregarCidades();
     else mostrarCidades();
-    mostrarCandidatos();
-    mostrarEscolhidos();
   }
 
   el.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || !el.contains(b)) return;
     const d = b.dataset;
-    if (d.remover) alternarDestaque(...d.remover.split('|'));
-    else if (d.cand) alternarDestaque(filtro.cargo, d.cand);
-    else if (d.cidade) definir({ cidade: d.cidade, abrangencia: 'cidade' }); // já vai ao ar "Só a cidade"
+    if (d.cidade) definir({ cidade: d.cidade, abrangencia: 'cidade' }); // já vai ao ar "Só a cidade"
     else if (d.cena) definir({ cena: d.cena });
     else if (d.abr) definir({ abrangencia: d.abr });
-    else if (d.dep) definir({ deputados: d.dep });
     else if (d.acao === 'rodizio') definir({ rodizio: !estado.rodizio });
     else if (d.acao === 'padrao') restaurarPadrao();
     else if (d.formato) definir({ formato: d.formato, listaPos: 0 });
@@ -293,22 +193,12 @@ export function montarPainel(el, fonte) {
     } else if (t.dataset.campo === 'tempo') definir({ tempo: Math.min(600, Math.max(3, Number(t.value) || 15)) });
     else if (t.dataset.campo === 'uf') trocarUf(t.value);
     else if (t.dataset.campo === 'regiao') escolherRegiao(t.value);
-    else if (t.dataset.dest) definir({ destaques: { ...estado.destaques, [t.dataset.dest]: t.value.trim() } });
-    else if (t.dataset.filtro === 'cargo' || t.dataset.filtro === 'partido') {
-      filtro[t.dataset.filtro] = t.value;
-      if (t.dataset.filtro === 'cargo') Object.assign(filtro, { partido: '' });
-      q('[data-lista="candidatos"]').innerHTML = '';
-      mostrarCandidatos();
-    }
   });
 
   // Os filtros de texto agem a cada tecla.
   el.addEventListener('input', (e) => {
     const t = e.target;
-    if (t.dataset.filtro === 'texto') {
-      filtro.texto = t.value;
-      mostrarCandidatos();
-    } else if ('filtroCidade' in t.dataset) {
+    if ('filtroCidade' in t.dataset) {
       filtro.cidade = t.value;
       mostrarCidades();
     }

@@ -2,7 +2,21 @@
 export const CONFIG = {
   // Estado mostrado em Governador/Senador/Deputados por padrão (URL: ?uf=CE)
   ufDestaque: 'CE',
-  turno: 1,
+  turno: 2,
+
+  // Disputas do 2º turno (25/10/2026), conforme o resultado do 1º turno publicado pelo TSE:
+  // números de urna de quem continua na disputa. Governador só tem 2º turno nestes estados.
+  segundoTurno: {
+    presidente: ['22', '13'], // Flávio Bolsonaro (PL) × Lula (PT)
+    governador: {
+      AC: ['11', '10'], // Mailza Assis (PP) × Alan Rick (Republicanos)
+      AM: ['55', '22'], // Omar Aziz (PSD) × Professora Maria do Carmo (PL)
+      DF: ['11', '13'], // Celina Leão (PP) × Leandro Grass (PT)
+      ES: ['10', '15'], // Lorenzo Pazolini (Republicanos) × Ricardo Ferraço (MDB)
+      RN: ['44', '13'], // Allyson (União) × Cadu de Lula (PT)
+      TO: ['44', '45'], // Professora Dorinha (União) × Vicentinho Júnior (PSDB)
+    },
+  },
 
   // Candidatos acompanhados de perto, de qualquer cargo (ex.: os deputados da cidade da emissora).
   // Informe o NÚMERO de urna de cada um. No telão, o painel de controle (tecla C)
@@ -12,9 +26,6 @@ export const CONFIG = {
     cidade: 'Aracati',
     presidente: [],
     governador: [],
-    senador: [],
-    depfederal: [],
-    depestadual: [],
   },
 
   // Tentados em ordem; se nenhum carregar, aparece o nome "SINAL NEWS" em texto.
@@ -33,12 +44,11 @@ export const CONFIG = {
     base: '/api/tse',
     ambiente: 'oficial', // 'oficial' no dia; 'simulado' nos testes públicos do TSE
     ciclo: 'ele2026',
-    // Códigos de eleição de 2026: 6257 = Eleição Geral Federal, 6259 = Eleições Gerais Estaduais.
-    // (Em 2022 eram 544 e 546, e senador e deputados ficavam na estadual.)
-    // Os códigos conferem com o arquivo de candidatos dos Dados Abertos do TSE (CD_ELEICAO).
-    // Em 30/09/2026 os arquivos de resultado ainda não estavam publicados.
+    // Códigos de eleição de 2026 (comum/config/ele-c.json do TSE):
+    //   1º turno: 6257 = Federal (Presidente), 6259 = Estadual (Governador, Senador, Deputados)
+    //   2º turno: 6258 = Federal (Presidente), 6260 = Estadual (Governador)
     // Rode `node scripts/sondar-tse.js` para ver o que já está no ar.
-    eleicao: { presidente: '6257', governador: '6259', senador: '6259', depfederal: '6259', depestadual: '6259' },
+    eleicao: { presidente: '6258', governador: '6260' },
     cargo: { presidente: '0001', governador: '0003', senador: '0005', depfederal: '0006', depestadual: '0007', depdistrital: '0008' },
     // 'auto' tenta o layout de 2024 (dados/...-u.json) e depois o de 2022 (dados-simplificados/...-r.json)
     formato: 'auto',
@@ -52,6 +62,12 @@ export const CONFIG = {
 
   telao: { segundosPorCena: 15 },
 };
+
+// Estados com Governador em disputa no 2º turno.
+export const UFS_GOVERNADOR = Object.keys(CONFIG.segundoTurno.governador);
+// Números de urna de quem disputa o 2º turno (vazio = sem disputa neste estado).
+export const numerosNaDisputa = (cargo, uf) => (cargo === 'presidente' ? CONFIG.segundoTurno.presidente : CONFIG.segundoTurno.governador[uf] || []);
+export const temDisputa = (cargo, uf) => cargo === 'presidente' || UFS_GOVERNADOR.includes(uf);
 
 const p = new URLSearchParams(location.search);
 if (/^[a-zA-Z]{2}$/.test(p.get('uf') || '')) CONFIG.ufDestaque = p.get('uf').toUpperCase();

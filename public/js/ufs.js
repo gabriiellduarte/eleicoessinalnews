@@ -40,9 +40,10 @@ export const nomeLocal = (uf, cidade) => (cidade ? `${cidade} (${uf})` : uf === 
 export const CARGOS = {
   presidente: { titulo: 'Presidente', nacional: true },
   governador: { titulo: 'Governador' },
-  senador: { titulo: 'Senador' },
-  depfederal: { titulo: 'Deputado Federal', abreviado: 'Dep. Federal', proporcional: true },
-  depestadual: { titulo: 'Deputado Estadual', abreviado: 'Dep. Estadual', proporcional: true },
+  // 2º turno: só Presidente e Governador. No 1º turno entravam também:
+  // senador: { titulo: 'Senador' },
+  // depfederal: { titulo: 'Deputado Federal', abreviado: 'Dep. Federal', proporcional: true },
+  // depestadual: { titulo: 'Deputado Estadual', abreviado: 'Dep. Estadual', proporcional: true },
 };
 
 export function vagasDe(cargo, uf) {

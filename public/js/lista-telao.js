@@ -14,6 +14,8 @@ export function escopoDaCena(cena) {
   const cidade = cidadeAtiva();
   if (cena.tipo === 'mapa') return { uf: 'BR', cidade: '' };
   if (cena.tipo === 'destaques') return { uf: estado.uf, cidade: estado.cidade };
+  // Governador no 2º turno: cada cena tem o seu estado; a cidade só vale se for desse estado.
+  if (cena.uf) return { uf: cena.uf, cidade: estado.uf === cena.uf ? cidade : '' };
   if (CARGOS[cena.cargo].nacional && estado.abrangencia === 'br') return { uf: 'BR', cidade: '' };
   if (estado.abrangencia === 'regiao') return CARGOS[cena.cargo].nacional ? { uf: 'BR', cidade: '', regiao: estado.regiao } : { uf: estado.uf, cidade: '' };
   return { uf: estado.uf, cidade };
