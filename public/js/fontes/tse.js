@@ -288,6 +288,25 @@ export const tse = {
     if (!Object.keys(saida).length) throw new Error('TSE ainda sem dados por estado.');
     return saida;
   },
+  // Votos de um candidato em cada município do estado (um arquivo do TSE por município,
+  // buscados 8 por vez). `aoProgresso(feitos, total)` é chamado a cada município concluído.
+  async porMunicipio(cargo, uf, numero, aoProgresso = () => {}) {
+    const lista = await municipios(uf);
+    const linhas = [];
+    let feitos = 0;
+    let proximo = 0;
+    const trabalhador = async () => {
+      while (proximo < lista.length) {
+        const m = lista[proximo++];
+        const r = await buscar(cargo, uf, m.nome).catch(() => null);
+        const c = r?.candidatos.find((x) => x.numero === String(numero));
+        if (c) linhas.push({ cidade: m.nome, votos: c.votos, pct: c.pct, validos: r.validos, pctSecoes: r.pctSecoes, aguardando: r.aguardando, posicao: c.pos });
+        aoProgresso(++feitos, lista.length);
+      }
+    };
+    await Promise.all(Array.from({ length: 8 }, trabalhador));
+    return linhas;
+  },
   async cidades(uf) {
     return (await municipios(uf)).map((m) => m.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   },

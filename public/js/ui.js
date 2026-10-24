@@ -104,6 +104,7 @@ export function criarLista(ul) {
       if (!el) {
         el = document.createElement('li');
         el.className = 'cand';
+        el.dataset.numero = n;
         el.innerHTML = `
           <div class="cand-pos"></div>
           <div class="avatar">${avatarHtml(c)}</div>

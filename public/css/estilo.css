@@ -1813,3 +1813,16 @@ body.mouse .t-engrenagem {
 /* A faixa agora fica dentro da coluna da direita, acima dos demais candidatos. */
 .telao-corpo .faixa-resultado { position: static; max-width: none; font-size: 1.35rem; padding: .7rem 1.2rem; }
 
+
+/* ---------- votação do candidato por município ---------- */
+.cand { cursor: pointer; }
+.municipios { grid-column: 1 / -1; }
+.mun-fechar { border: 1px solid currentColor; background: none; color: inherit; border-radius: .5rem; padding: .35rem .7rem; font: inherit; cursor: pointer; opacity: .75; }
+.mun-fechar:hover { opacity: 1; }
+.mun-tabela-wrap { max-height: 28rem; overflow: auto; margin-top: .75rem; }
+.mun-tabela { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.mun-tabela th, .mun-tabela td { padding: .45rem .6rem; text-align: left; border-bottom: 1px solid var(--linha); }
+.mun-tabela .num { text-align: right; }
+.mun-tabela th { position: sticky; top: 0; background: var(--painel); cursor: pointer; user-select: none; white-space: nowrap; }
+.mun-tabela th[aria-sort="descending"]::after { content: " ↓"; }
+.mun-tabela th[aria-sort="ascending"]::after { content: " ↑"; }

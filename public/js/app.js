@@ -96,6 +96,8 @@ function selecionar(cargo, uf, cidade = '', regiao = '') {
   $('titulo').textContent = tituloCargo(cargo, uf);
   $('local').textContent = regiao ? `Região ${REGIOES[regiao]}` : nomeLocal(uf, cidade);
   $('busca').value = '';
+  $('municipios').hidden = true;
+  pedidoMun++;
   $('mapa-titulo').textContent = c.nacional ? 'Quem lidera em cada estado' : 'Andamento da apuração por estado';
   $('mapa-dica').hidden = !c.nacional;
   $('mapa-voltar').hidden = !regiao;
@@ -200,6 +202,71 @@ async function atualizarDestaques() {
     $('destaques').hidden = true;
   }
 }
+
+// --- votação de um candidato município por município ---------------------------
+const mun = { numero: '', cargo: '', uf: '', nome: '', linhas: [], ord: 'votos', asc: false, busca: '' };
+let pedidoMun = 0;
+
+function desenharMunicipios() {
+  const total = mun.linhas.reduce((t, l) => t + l.votos, 0);
+  const alvo = semAcento(mun.busca);
+  const linhas = mun.linhas
+    .map((l) => ({ ...l, partCand: total ? (l.votos / total) * 100 : 0 }))
+    .filter((l) => !alvo || semAcento(l.cidade).includes(alvo))
+    .sort((a, b) => (mun.ord === 'cidade' ? a.cidade.localeCompare(b.cidade, 'pt-BR') : a[mun.ord] - b[mun.ord]) * (mun.asc ? 1 : -1));
+  document.querySelectorAll('.mun-tabela th').forEach((th) => th.setAttribute('aria-sort', th.dataset.ord === mun.ord ? (mun.asc ? 'ascending' : 'descending') : 'none'));
+  $('mun-sub').textContent = `${fmt.int(total)} votos em ${mun.linhas.length} municípios · ${nomeLocal(mun.uf, '')}`;
+  $('mun-corpo').innerHTML = linhas
+    .map((l) => `<tr><td>${esc(l.cidade)}</td><td class="num">${fmt.int(l.votos)}</td><td class="num">${fmt.pct(l.pct)}</td><td class="num">${fmt.pct(l.partCand)}</td></tr>`)
+    .join('') || '<tr><td colspan="4">Nenhum município encontrado.</td></tr>';
+}
+
+async function abrirMunicipios(numero) {
+  const cand = ultimo?.candidatos.find((c) => c.numero === String(numero));
+  if (!cand || !fonte.porMunicipio) return;
+  const meu = ++pedidoMun;
+  const uf = ultimo.uf === 'BR' ? CONFIG.ufDestaque : ultimo.uf;
+  Object.assign(mun, { numero: cand.numero, cargo: ultimo.cargo, uf, nome: cand.nome, linhas: [], busca: '' });
+  $('mun-busca').value = '';
+  $('mun-titulo').textContent = `${cand.nome} · ${cand.partido} ${cand.numero}`;
+  $('mun-sub').textContent = 'Buscando municípios…';
+  $('mun-corpo').innerHTML = '';
+  $('municipios').hidden = false;
+  $('mun-progresso').hidden = false;
+  $('municipios').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  try {
+    mun.linhas = await fonte.porMunicipio(mun.cargo, uf, cand.numero, (feitos, total) => {
+      if (meu !== pedidoMun) return;
+      $('mun-barra').style.width = `${(feitos / total) * 100}%`;
+      $('mun-sub').textContent = `Buscando municípios… ${feitos}/${total}`;
+    });
+    if (meu !== pedidoMun) return;
+    desenharMunicipios();
+  } catch (e) {
+    if (meu === pedidoMun) $('mun-sub').textContent = `Não foi possível carregar os municípios. ${e.message}`;
+  } finally {
+    if (meu === pedidoMun) $('mun-progresso').hidden = true;
+  }
+}
+$('lista').addEventListener('click', (e) => {
+  const li = e.target.closest('.cand');
+  if (li) abrirMunicipios(li.dataset.numero);
+});
+$('mun-fechar').addEventListener('click', () => {
+  pedidoMun++;
+  $('municipios').hidden = true;
+});
+$('mun-busca').addEventListener('input', (e) => {
+  mun.busca = e.target.value;
+  desenharMunicipios();
+});
+document.querySelector('.mun-tabela thead').addEventListener('click', (e) => {
+  const ord = e.target.closest('th')?.dataset.ord;
+  if (!ord) return;
+  mun.asc = mun.ord === ord ? !mun.asc : ord === 'cidade';
+  mun.ord = ord;
+  desenharMunicipios();
+});
 
 selecionar('presidente', 'BR');
 atualizarDestaques();

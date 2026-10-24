@@ -58,6 +58,7 @@
       <div class="erro" id="erro" hidden></div>
       <ul class="lista" id="lista" aria-live="off"></ul>
       <p class="nota" id="nota-lista" hidden></p>
+      <p class="nota" id="dica-municipios">Clique num candidato para ver a votação dele município por município.</p>
     </section>
 
     <aside class="lateral">
@@ -88,6 +89,29 @@
         </div>
       </section>
     </aside>
+
+    <section class="cartao municipios" id="municipios" hidden>
+      <div class="cab">
+        <div>
+          <h2 id="mun-titulo"></h2>
+          <p id="mun-sub"></p>
+        </div>
+        <button type="button" class="mun-fechar" id="mun-fechar">Fechar ✕</button>
+      </div>
+      <input type="search" id="mun-busca" class="busca" placeholder="Filtrar município" aria-label="Filtrar município">
+      <div class="progresso" id="mun-progresso" hidden><div class="barra"><i id="mun-barra"></i></div></div>
+      <div class="mun-tabela-wrap">
+        <table class="mun-tabela">
+          <thead><tr>
+            <th data-ord="cidade">Município</th>
+            <th data-ord="votos" class="num">Votos</th>
+            <th data-ord="pct" class="num">% válidos</th>
+            <th data-ord="partCand" class="num">% do total dele</th>
+          </tr></thead>
+          <tbody id="mun-corpo"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <footer class="rodape">
