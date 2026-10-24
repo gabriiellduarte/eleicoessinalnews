@@ -1,8 +1,9 @@
 # Apuração Eleições 2026 · Sinal News
 
 
-Cargos: Presidente, Governador, Senador, Deputado Federal e Deputado Estadual (Distrital no DF),
-no país, por estado e por cidade.
+**2º turno (25/10/2026)**: Presidente (Flávio Bolsonaro × Lula) e Governador nos estados que tiveram
+2º turno segundo o TSE: AC, AM, DF, ES, RN e TO. As disputas ficam em `segundoTurno` (`public/js/config.js`).
+No telão há uma cena de Governador para cada um desses estados (`?cena=gov-ac`, `gov-am`, ...).
 
 ## Rodar
 
@@ -21,7 +22,7 @@ Só **TSE oficial, ao vivo**: a tela busca os arquivos do TSE a cada 10 segundos
 Quantidade: 10, 20, 30, 50, todas as vagas ou só os escolhidos. Acima de 10 nomes: páginas de 10, rolagem
 automática (sobe devagar e recomeça) ou rolagem manual (setas ▲ ▼ no controle). A cena fica no ar até a lista passar.
 
-Parâmetros de URL do telão: `?uf=CE`, `?cidade=Aracati`, `?tempo=15`, `?cena=destaques`.
+Parâmetros de URL do telão: `?uf=CE`, `?cidade=Aracati`, `?tempo=15`, `?cena=gov-df`.
 
 ## Cadastro oficial (candidatos e cidades)
 
@@ -46,7 +47,7 @@ de `public/js/config.js`.
 
 Tudo em `public/js/config.js`:
 
-1. `tse.eleicao`: já preenchido com `6257` (Eleição Geral Federal) e `6259` (Eleições Gerais Estaduais).
+1. `tse.eleicao`: `6258` (Presidente, 2º turno) e `6260` (Governador, 2º turno). No 1º turno eram `6257` e `6259`.
 2. `tse.ambiente`: `oficial`.
 
 Enquanto o TSE não começa a totalizar, o site mostra os candidatos oficiais com zero voto e o aviso

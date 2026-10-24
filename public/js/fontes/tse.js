@@ -5,7 +5,7 @@
 //   ({mun} = código TSE do município; vazio para o resultado do estado/país)
 // O layout de 2026 só pode ser confirmado quando o TSE publicar os arquivos;
 // se mudar, o ajuste fica restrito a `urls()` e `normalizar()`.
-import { CONFIG } from '../config.js';
+import { CONFIG, UFS_GOVERNADOR, numerosNaDisputa, temDisputa } from '../config.js';
 import { UFS, REGIOES, ufsDaRegiao, vagasDe, nomeLocal, semAcento } from '../ufs.js';
 import { cadastro, nomeProprio } from './cadastro.js';
 
@@ -97,7 +97,9 @@ function normalizar(d, cargo, uf, cidade) {
         votos: num(c.vap),
         pct: num(c.pvap),
         situacao,
-        eleito: String(c.e || '').toLowerCase() === 's' || /^eleit/i.test(situacao),
+        // Vale o que o TSE publica, assim que publica (não espera 100% das seções).
+        // `e: "s"` também marca quem foi ao 2º turno; por isso manda a situação (`st`): "Eleito", "2º turno", "Não eleito".
+        eleito: situacao ? /^eleit/i.test(situacao) : String(c.e || '').toLowerCase() === 's',
         foto: c.sqcand ? `${raiz}/fotos/${uf.toLowerCase()}/${c.sqcand}.jpeg` : '',
       };
     })
@@ -148,9 +150,10 @@ async function enriquecer(r) {
   return r;
 }
 
-// Antes de o TSE publicar os arquivos: candidatos oficiais com zero voto.
+// Antes de o TSE publicar os arquivos: os candidatos do 2º turno com zero voto.
 async function aguardando(cargo, uf, cidade) {
-  const lista = await candidatosOficiais(cargo, uf);
+  const naDisputa = numerosNaDisputa(cargo, uf);
+  const lista = (await candidatosOficiais(cargo, uf)).filter((c) => naDisputa.includes(c.numero));
   if (!lista.length) throw new Error(`TSE ainda sem dados para ${cargo} em ${nomeLocal(uf, cidade)}.`);
   const zero = { pctSecoes: 0, secoes: 0, secoesTotalizadas: 0, eleitorado: 0, comparecimento: 0, pctComparecimento: 0, abstencao: 0, pctAbstencao: 0, brancos: 0, pctBrancos: 0, nulos: 0, pctNulos: 0, validos: 0 };
   return {
@@ -220,6 +223,7 @@ async function consultar(cargo, uf, cidade, chave) {
 }
 
 function buscar(cargo, uf, cidade = '') {
+  if (!temDisputa(cargo, uf)) return Promise.reject(new Error(`Sem 2º turno para ${cargo === 'governador' ? 'Governador' : cargo} em ${nomeLocal(uf)}: a disputa terminou no 1º turno.`));
   const chave = `${cargo}|${uf}|${cidade}`;
   const ultimo = ultimos.get(chave);
   if (ultimo && Date.now() - ultimo.em < FRESCO_MS) return Promise.resolve(ultimo.resultado);
@@ -279,11 +283,13 @@ export const tse = {
   intervaloMs: CONFIG.atualizacao.tseMs,
   resultado: buscar,
   regiao,
+  // Governador: só os estados com 2º turno.
   async mapa(cargo) {
-    const res = await Promise.allSettled(UFS.map((u) => buscar(cargo, u.sigla)));
+    const ufs = cargo === 'governador' ? UFS_GOVERNADOR : UFS.map((u) => u.sigla);
+    const res = await Promise.allSettled(ufs.map((uf) => buscar(cargo, uf)));
     const saida = {};
     res.forEach((r, i) => {
-      if (r.status === 'fulfilled') saida[UFS[i].sigla] = r.value;
+      if (r.status === 'fulfilled') saida[ufs[i]] = r.value;
     });
     if (!Object.keys(saida).length) throw new Error('TSE ainda sem dados por estado.');
     return saida;

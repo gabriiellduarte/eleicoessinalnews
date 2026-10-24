@@ -1,8 +1,9 @@
 // Sonda os arquivos de resultado do TSE para descobrir o que já está publicado.
 // Uso: node scripts/sondar-tse.js [ambiente]      (ambiente: oficial | simulado)
 const AMBIENTE = process.argv[2] || 'oficial';
-const FEDERAL = process.env.TSE_FEDERAL || '6257';
-const ESTADUAL = process.env.TSE_ESTADUAL || '6259';
+// 2º turno: 6258 (Presidente) e 6260 (Governador). No 1º turno eram 6257 e 6259.
+const FEDERAL = process.env.TSE_FEDERAL || '6258';
+const ESTADUAL = process.env.TSE_ESTADUAL || '6260';
 const BASE = 'https://resultados.tse.jus.br';
 const CABECALHOS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
@@ -16,7 +17,7 @@ const caminhos = [
   `${AMBIENTE}/ele2026/${FEDERAL}/dados/br/br-c0001-e${e6(FEDERAL)}-u.json`,
   `${AMBIENTE}/ele2026/${FEDERAL}/dados-simplificados/br/br-c0001-e${e6(FEDERAL)}-r.json`,
   `${AMBIENTE}/ele2026/${FEDERAL}/dados/ce/ce-c0001-e${e6(FEDERAL)}-u.json`,
-  `${AMBIENTE}/ele2026/${ESTADUAL}/dados/ce/ce-c0003-e${e6(ESTADUAL)}-u.json`,
+  `${AMBIENTE}/ele2026/${ESTADUAL}/dados/ac/ac-c0003-e${e6(ESTADUAL)}-u.json`,
   `${AMBIENTE}/ele2026/${ESTADUAL}/dados-simplificados/ce/ce-c0003-e${e6(ESTADUAL)}-r.json`,
   `${AMBIENTE}/ele2026/${ESTADUAL}/dados/ce/ce-c0005-e${e6(ESTADUAL)}-u.json`,
   `${AMBIENTE}/ele2026/${ESTADUAL}/dados/ce/ce-c0006-e${e6(ESTADUAL)}-u.json`,

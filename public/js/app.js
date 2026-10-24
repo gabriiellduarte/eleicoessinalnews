@@ -1,5 +1,5 @@
 // Página pública da apuração.
-import { CONFIG } from './config.js';
+import { CONFIG, UFS_GOVERNADOR, temDisputa } from './config.js';
 import { UFS, UF_POR_SIGLA, CARGOS, REGIOES, ufsDaRegiao, nomeLocal, tituloCargo, semAcento } from './ufs.js';
 import { fonte } from './fontes/index.js';
 import { carregarDestaques, rotuloCargo, textoPosicao } from './destaques.js';
@@ -9,7 +9,7 @@ const $ = (id) => document.getElementById(id);
 const LIMITE_LISTA = 30;
 const estado = { cargo: 'presidente', uf: 'BR', cidade: '', regiao: '', busca: '' };
 let atualizarLista = criarLista($('lista'));
-const atualizarMapa = criarMapa($('mapa'), (uf, e) => (CARGOS[estado.cargo].nacional ? abrirMenuMapa(uf, e) : selecionar(estado.cargo, uf)));
+const atualizarMapa = criarMapa($('mapa'), (uf, e) => (CARGOS[estado.cargo].nacional ? abrirMenuMapa(uf, e) : temDisputa(estado.cargo, uf) && selecionar(estado.cargo, uf)));
 let pedido = 0;
 let ultimo = null; // último resultado recebido, para a busca filtrar sem nova consulta
 
@@ -23,9 +23,11 @@ $('abas').innerHTML = Object.entries(CARGOS)
 $('abas').addEventListener('click', (e) => {
   const cargo = e.target.dataset?.cargo;
   if (!cargo) return;
-  const mantemLocal = estado.uf !== 'BR';
+  const mantemLocal = estado.uf !== 'BR' && temDisputa(cargo, estado.uf);
   if (CARGOS[cargo].nacional && !estado.cidade) selecionar(cargo, 'BR');
-  else selecionar(cargo, mantemLocal ? estado.uf : CONFIG.ufDestaque, mantemLocal ? estado.cidade : '');
+  else if (mantemLocal) selecionar(cargo, estado.uf, estado.cidade);
+  // Governador: o estado da emissora, se tiver 2º turno; senão, o primeiro estado com 2º turno.
+  else selecionar(cargo, temDisputa(cargo, CONFIG.ufDestaque) ? CONFIG.ufDestaque : UFS_GOVERNADOR[0]);
 });
 // Valores "R:NE" no seletor são regiões; o resto, siglas de estado.
 $('uf').addEventListener('change', (e) => {
@@ -89,7 +91,10 @@ function selecionar(cargo, uf, cidade = '', regiao = '') {
         Object.entries(REGIOES).map(([sigla, nome]) => `<option value="R:${sigla}">Região ${nome}</option>`).join('') +
         '</optgroup><optgroup label="Estados">'
       : '') +
-    [...UFS].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((u) => `<option value="${u.sigla}">${u.nome}</option>`).join('') +
+    // Governador: só os estados com 2º turno.
+    UFS.filter((u) => temDisputa(cargo, u.sigla))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      .map((u) => `<option value="${u.sigla}">${u.nome}</option>`).join('') +
     (c.nacional ? '</optgroup>' : '');
   $('uf').value = regiao ? `R:${regiao}` : uf;
   preencherCidades(uf);
@@ -98,7 +103,7 @@ function selecionar(cargo, uf, cidade = '', regiao = '') {
   $('busca').value = '';
   $('municipios').hidden = true;
   pedidoMun++;
-  $('mapa-titulo').textContent = c.nacional ? 'Quem lidera em cada estado' : 'Andamento da apuração por estado';
+  $('mapa-titulo').textContent = c.nacional ? 'Quem lidera em cada estado' : 'Estados com 2º turno para Governador';
   $('mapa-dica').hidden = !c.nacional;
   $('mapa-voltar').hidden = !regiao;
   if (c.nacional) $('mapa-titulo').textContent = regiao ? `Região ${REGIOES[regiao]}: quem lidera em cada estado` : 'Quem lidera em cada estado';

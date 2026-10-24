@@ -1,9 +1,9 @@
 // Modo telão: cenas em rodízio, pensado para 16:9 em tela cheia.
 // Comandado pelo painel (tecla C) ou pela página controle.html em outra janela.
 // URL: ?uf=CE · ?cidade=Aracati (só os votos da cidade) · ?tempo=15
-//      ?cena=presidente|mapa|governador|senador|depfederal|depestadual|destaques|cidade (fixa a cena)
-import { CONFIG } from './config.js';
-import { UFS, CARGOS, REGIOES, nomeLocal, tituloCargo } from './ufs.js';
+//      ?cena=presidente|mapa|gov-ac|gov-am|gov-df|gov-es|gov-rn|gov-to (fixa a cena; 2º turno)
+import { CONFIG, UFS_GOVERNADOR } from './config.js';
+import { UFS, CARGOS, REGIOES, ufsDaRegiao, nomeLocal, tituloCargo } from './ufs.js';
 import { fonte } from './fontes/index.js';
 import { CENAS, estado, definir, aoMudar, pedirAoEntrar, tituloDestaques } from './estado-telao.js';
 import { carregarDestaques, rotuloCargo, textoPosicao } from './destaques.js';
@@ -21,6 +21,8 @@ let cenaNoAr = estado.cena;
 let pedido = 0;
 let listas = {};
 const atualizarMapa = criarMapa($('t-mapa'));
+// Mapa ao lado dos cartões de Presidente e Governador (no 2º turno não há "demais candidatos").
+const atualizarMapaCargo = criarMapa($('t-mapa-cargo'));
 
 montarLogo($('logo'));
 $('turno').textContent = CONFIG.turno;
@@ -37,6 +39,7 @@ const cenaAtual = () => {
 function caberNome(el) {
   el.style.fontSize = '';
   const base = parseFloat(getComputedStyle(el).fontSize);
+  if (!(base > 0)) return; // janela sem tamanho (oculta): fonte 0 travaria o laço abaixo
   const altura = parseFloat(getComputedStyle(el).lineHeight) / base;
   for (let tam = base; tam >= base * 0.6; tam -= base * 0.04) {
     el.style.fontSize = `${tam}px`;
@@ -202,9 +205,8 @@ function montarCena() {
   $('t-titulo').innerHTML = `${esc(titulo)} <span>· ${esc(complemento)}</span>`;
   Object.entries(SECAO).forEach(([tipo, id]) => ($(id).hidden = tipo !== cena.tipo));
   // Listas novas a cada montagem: os candidatos mudam com a cena, o estado e a cidade.
-  for (const id of ['duelo', 'demais', 't-legenda', 'ranking', 'locais']) $(id).innerHTML = '';
+  for (const id of ['duelo', 't-legenda', 'ranking', 'locais']) $(id).innerHTML = '';
   listas = {
-    demais: criarLista($('demais')),
     legenda: criarLista($('t-legenda')),
     ranking: criarLista($('ranking')),
   };
@@ -225,16 +227,15 @@ async function atualizar() {
       atualizarLocais(d, uf, cidade);
       r = d.referencia;
     } else {
-      const [res, mapa] = await Promise.all([resultadoNoEscopo(fonte, cena.cargo, escopo), cena.tipo === 'mapa' ? fonte.mapa(cena.cargo) : null]);
+      const comMapa = cena.tipo === 'mapa' || cena.tipo === 'majoritario';
+      const [res, mapa] = await Promise.all([resultadoNoEscopo(fonte, cena.cargo, escopo), comMapa ? fonte.mapa(cena.cargo).catch(() => null) : null]);
       if (meu !== pedido) return;
       r = res;
       const cor = coresPara(`${cena.cargo}|${uf}`, r.candidatos);
       if (cena.tipo === 'majoritario') {
-        // Os dois primeiros ficam nos cartões grandes; a lista segue a partir do 3º.
+        // Os dois candidatos nos cartões grandes; ao lado, o mapa da apuração.
         atualizarDuelo(r.candidatos.slice(0, 2), cor);
-        const demais = r.candidatos.slice(2);
-        listas.demais(demais, cor);
-        prepararRolagem([$('demais')], demais.length, DESENHO_ROLAGEM.majoritario.naTela);
+        desenharMapaCargo(cena, escopo, mapa, cor);
       } else if (cena.tipo === 'mapa') {
         atualizarMapa(mapa, { modo: 'lider', cor });
         listas.legenda(r.candidatos.slice(0, 4), cor);
@@ -245,7 +246,7 @@ async function atualizar() {
       }
     }
     $('t-erro').hidden = true;
-    // Faixa "Eleito no 1º turno" / "2º turno" nas disputas de Presidente, Governador e Senador.
+    // Faixa "Eleito no 2º turno" quando o TSE define o resultado.
     const definicao = r && !CARGOS[cena.cargo].proporcional && ['majoritario', 'proporcional'].includes(cena.tipo) ? resumoDefinicao(r.candidatos) : null;
     $('faixa-resultado').hidden = !definicao;
     if (definicao) {
@@ -260,6 +261,20 @@ async function atualizar() {
     $('t-erro').hidden = false;
     $('t-erro').textContent = `Aguardando dados do TSE. ${e.message}`;
   }
+}
+
+// Presidente: o país, com o estado (ou a região) no ar em destaque.
+// Governador: só os estados com 2º turno acesos, o da cena contornado; cada estado tem os seus candidatos,
+// por isso a cor de quem lidera vem da tabela de cores daquele estado.
+function desenharMapaCargo(cena, { uf, regiao }, mapa, cor) {
+  if (CARGOS[cena.cargo].nacional) {
+    $('mapa-cargo-titulo').textContent = regiao ? `Região ${REGIOES[regiao]}: quem lidera` : 'Quem lidera em cada estado';
+    atualizarMapaCargo(mapa, { modo: 'lider', cor, selecionada: uf !== 'BR' ? uf : [], foco: regiao ? ufsDaRegiao(regiao) : [] });
+    return;
+  }
+  $('mapa-cargo-titulo').textContent = 'Governador: estados com 2º turno';
+  const corNoEstado = (numero, sigla) => (sigla === uf ? cor : coresPara(`${cena.cargo}|${sigla}`, mapa?.[sigla]?.candidatos))(numero);
+  atualizarMapaCargo(mapa, { modo: 'lider', cor: corNoEstado, selecionada: uf, foco: UFS_GOVERNADOR });
 }
 
 // --- rolagem das listas (deputados, demais candidatos e resultado da cidade) ------
